@@ -33,5 +33,33 @@ typedef struct Window {
   Rect *rect;
 } Window;
 
+void makeCursorInvisible() { printf("\033[?25l"); }
+
+void makeCursorVisible() { printf("\033[?25h"); }
+
+void alternateScreen() { printf("\033[?1049h"); }
+
+void normalScreen() { printf("\033[?1049l"); }
+
+void ttySetRaw() {
+  struct termios t;
+  if (tcgetattr(STDIN_FILENO, &t) == -1) {
+    exit(EXIT_FAILURE);
+  }
+
+  oldTermios = t;
+
+  t.c_lflag &= ~(ICANON | ISIG | IEXTEN | ECHO);
+  t.c_iflag &= ~(BRKINT | ICRNL | IGNBRK | IGNCR | INLCR | INPCK | ISTRIP |
+                 IXON | PARMRK);
+  t.c_oflag &= ~OPOST;
+  t.c_cc[VMIN] = 1;
+  t.c_cc[VTIME] = 0;
+
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &t) == -1) {
+    exit(EXIT_FAILURE);
+  }
+}
+
 int main() {
 }
