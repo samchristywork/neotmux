@@ -1,7 +1,8 @@
 #define _XOPEN_SOURCE 600
 
-#include <ctype.h>
+#include <client.h>
 #include <fcntl.h>
+#include <server.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -10,20 +11,12 @@
 #include <unistd.h>
 #include <vterm.h>
 
-#define MAX_NAME 1000
 #define BUF_SIZE 256
 
 struct termios oldTermios;
 
 char lastWritten[BUF_SIZE];
 size_t lastWrittenLen = 0;
-
-typedef struct Rect {
-  int width;
-  int height;
-  int col;
-  int row;
-} Rect;
 
 typedef struct Window {
   int process;
@@ -33,129 +26,6 @@ typedef struct Window {
   Rect *rect;
 } Window;
 
-void makeCursorInvisible() { printf("\033[?25l"); }
-
-void makeCursorVisible() { printf("\033[?25h"); }
-
-void alternateScreen() { printf("\033[?1049h"); }
-
-void normalScreen() { printf("\033[?1049l"); }
-
-void ttySetRaw() {
-  struct termios t;
-  if (tcgetattr(STDIN_FILENO, &t) == -1) {
-    exit(EXIT_FAILURE);
-  }
-
-  oldTermios = t;
-
-  t.c_lflag &= ~(ICANON | ISIG | IEXTEN | ECHO);
-  t.c_iflag &= ~(BRKINT | ICRNL | IGNBRK | IGNCR | INLCR | INPCK | ISTRIP |
-                 IXON | PARMRK);
-  t.c_oflag &= ~OPOST;
-  t.c_cc[VMIN] = 1;
-  t.c_cc[VTIME] = 0;
-
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &t) == -1) {
-    exit(EXIT_FAILURE);
-  }
-}
-
-int ptyOpen(char *childName, size_t len) {
-  int fd = posix_openpt(O_RDWR | O_NOCTTY);
-  if (fd == -1) {
-    exit(EXIT_FAILURE);
-  }
-
-  if (grantpt(fd) == -1) {
-    exit(EXIT_FAILURE);
-  }
-
-  if (unlockpt(fd) == -1) {
-    exit(EXIT_FAILURE);
-  }
-
-  char *p = ptsname(fd);
-  if (p == NULL) {
-    exit(EXIT_FAILURE);
-  }
-
-  if (strlen(p) < len) {
-    strncpy(childName, p, len);
-  } else {
-    exit(EXIT_FAILURE);
-  }
-
-  return fd;
-}
-
-pid_t ptyFork(int *parentFd, char *childName, size_t len,
-              const struct winsize *ws) {
-  char name[MAX_NAME];
-  int fd = ptyOpen(name, MAX_NAME);
-  if (fd == -1) {
-    exit(EXIT_FAILURE);
-  }
-
-  if (childName != NULL) {
-    if (strlen(name) < len) {
-      strncpy(childName, name, len);
-
-    } else {
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  pid_t childPid = fork();
-  if (childPid == -1) {
-    exit(EXIT_FAILURE);
-  }
-
-  if (childPid != 0) { // Parent
-    *parentFd = fd;
-    return childPid;
-  }
-
-  if (setsid() == -1) {
-    exit(EXIT_FAILURE);
-  }
-
-  close(fd);
-
-  {
-    int fd = open(name, O_RDWR);
-    if (fd == -1) {
-      exit(EXIT_FAILURE);
-    }
-
-    if (tcsetattr(fd, TCSANOW, &oldTermios) == -1) {
-      exit(EXIT_FAILURE);
-    }
-
-    if (ioctl(fd, TIOCSWINSZ, ws) == -1) {
-      exit(EXIT_FAILURE);
-    }
-
-    if (dup2(fd, STDIN_FILENO) != STDIN_FILENO) {
-      exit(EXIT_FAILURE);
-    }
-
-    if (dup2(fd, STDOUT_FILENO) != STDOUT_FILENO) {
-      exit(EXIT_FAILURE);
-    }
-
-    if (dup2(fd, STDERR_FILENO) != STDERR_FILENO) {
-      exit(EXIT_FAILURE);
-    }
-
-    if (fd > STDERR_FILENO) {
-      close(fd);
-    }
-  }
-
-  return 0;
-}
-
 static void ttyReset() {
   if (tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios) == -1) {
     exit(EXIT_FAILURE);
@@ -163,126 +33,6 @@ static void ttyReset() {
 
   makeCursorVisible();
   normalScreen();
-}
-
-void initScreen(VTerm **vt, VTermScreen **vts, int h, int w) {
-  *vt = vterm_new(h, w);
-  if (!vt) {
-    exit(EXIT_FAILURE);
-  }
-
-  *vts = vterm_obtain_screen(*vt);
-
-  static VTermScreenCallbacks callbacks;
-  callbacks.damage = NULL;
-  callbacks.moverect = NULL;
-  callbacks.movecursor = NULL;
-  callbacks.settermprop = NULL;
-  callbacks.bell = NULL;
-  callbacks.resize = NULL;
-  callbacks.sb_pushline = NULL;
-  callbacks.sb_popline = NULL;
-
-  vterm_screen_reset(*vts, 1);
-  vterm_screen_enable_altscreen(*vts, 1);
-  vterm_screen_set_callbacks(*vts, &callbacks, NULL);
-}
-
-void printColor(char *prefix, VTermColor *color) {
-  printf("%s", prefix);
-  if (VTERM_COLOR_IS_RGB(color)) {
-    printf("  RGB:\r\n");
-    printf("    Red: %d\r\n", color->rgb.red);
-    printf("    Green: %d\r\n", color->rgb.green);
-    printf("    Blue: %d\r\n", color->rgb.blue);
-  } else if (VTERM_COLOR_IS_INDEXED(color)) {
-    printf("  Indexed:\r\n");
-    printf("    Idx: %d\r\n", color->indexed.idx);
-  }
-}
-
-void printCellInfo(VTermScreenCell cell) {
-  printf("Cell Info:\r\n");
-  // printf("  Chars: %s\r\n", cell.chars);
-  printf("  Width: %d\r\n", cell.width);
-  printf("  Attrs:\r\n");
-  printf("    Bold: %d\r\n", cell.attrs.bold);
-  printf("    Underline: %d\r\n", cell.attrs.underline);
-  printf("    Italic: %d\r\n", cell.attrs.italic);
-  printf("    Blink: %d\r\n", cell.attrs.blink);
-  printf("    Reverse: %d\r\n", cell.attrs.reverse);
-  printf("    Strike: %d\r\n", cell.attrs.strike);
-  printf("    Font: %d\r\n", cell.attrs.font);
-  printf("    DWL: %d\r\n", cell.attrs.dwl);
-  printf("    DHL: %d\r\n", cell.attrs.dhl);
-  printColor("  FG:\r\n", &cell.fg);
-  printColor("  BG:\r\n", &cell.bg);
-}
-
-void printLastWritten() {
-  printf("len: %ld\r\n", lastWrittenLen);
-  for (size_t i = 0; i < lastWrittenLen; i++) {
-    if (isprint(lastWritten[i])) {
-      printf("%c", lastWritten[i]);
-    } else {
-      printf("\\x%02x", lastWritten[i]);
-    }
-  }
-}
-
-bool isInRect(int row, int col, Rect *rect) {
-  if (row < rect->row || row >= rect->row + rect->height) {
-    return false;
-  }
-
-  if (col < rect->col || col >= rect->col + rect->width) {
-    return false;
-  }
-
-  return true;
-}
-
-void renderCell(Window *window, int row, int col) {
-  VTermPos pos;
-  pos.row = row;
-  pos.col = col;
-  VTermScreen *vts = window->vts;
-
-  VTermScreenCell cell;
-  vterm_screen_get_cell(vts, pos, &cell);
-
-  bool needsReset = false;
-
-  if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
-    printf("\033[48;5;%dm", cell.bg.indexed.idx);
-    needsReset = true;
-  } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
-    printf("\033[48;2;%d;%d;%dm", cell.bg.rgb.red, cell.bg.rgb.green,
-           cell.bg.rgb.blue);
-    needsReset = true;
-  }
-
-  if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
-    printf("\033[38;5;%dm", cell.fg.indexed.idx);
-    needsReset = true;
-  } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
-    printf("\033[38;2;%d;%d;%dm", cell.fg.rgb.red, cell.fg.rgb.green,
-           cell.fg.rgb.blue);
-    needsReset = true;
-  }
-
-  char c = cell.chars[0];
-  if (cell.width == 1 && (isalnum(c) || c == ' ' || ispunct(c))) {
-    printf("%c", c);
-  } else if (c == 0) {
-    printf(" ");
-  } else {
-    printf("?");
-  }
-
-  if (needsReset) {
-    printf("\033[0m");
-  }
 }
 
 int main() {
@@ -309,7 +59,7 @@ int main() {
   windows[1].process = -1;
   windows[1].rect = malloc(sizeof(Rect));
   windows[1].rect->width = ws.ws_col;
-  windows[1].rect->height = ws.ws_row / 2-1;
+  windows[1].rect->height = ws.ws_row / 2 - 1;
   windows[1].rect->col = 0;
   windows[1].rect->row = ws.ws_row / 2 + 1;
   windows[1].shell = "/usr/bin/bash";
@@ -324,7 +74,8 @@ int main() {
     ws.ws_ypixel = 0;
 
     char childName[MAX_NAME];
-    pid_t childPid = ptyFork(&windows[i].process, childName, MAX_NAME, &ws);
+    pid_t childPid =
+        ptyFork(&windows[i].process, childName, MAX_NAME, &ws, oldTermios);
     if (childPid == -1) {
       exit(EXIT_FAILURE);
     }
@@ -340,7 +91,7 @@ int main() {
                windows[i].rect->width);
   }
 
-  ttySetRaw();
+  oldTermios = ttySetRaw();
 
   if (atexit(ttyReset) != 0) {
     exit(EXIT_FAILURE);
@@ -406,7 +157,8 @@ int main() {
     printf("\033[H"); // Move cursor to top left
 
     VTermPos cursorPos;
-    vterm_state_get_cursorpos(vterm_obtain_state(windows[activeTerm].vt), &cursorPos);
+    vterm_state_get_cursorpos(vterm_obtain_state(windows[activeTerm].vt),
+                              &cursorPos);
 
     for (int row = 0; row < ws.ws_row - 1; row++) {
       // printf("\033[K"); // Clear line
@@ -418,8 +170,14 @@ int main() {
         bool isRendered = false;
         for (int k = 0; k < 2; k++) {
           if (isInRect(row, col, windows[k].rect)) {
-            renderCell(&windows[k], row - windows[k].rect->row,
-                       col - windows[k].rect->col);
+            VTermPos pos;
+            pos.row = row - windows[k].rect->row;
+            pos.col = col - windows[k].rect->col;
+            VTermScreen *vts = windows[k].vts;
+
+            VTermScreenCell cell;
+            vterm_screen_get_cell(vts, pos, &cell);
+            renderCell(cell);
             isRendered = true;
             break;
           }
