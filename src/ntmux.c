@@ -251,6 +251,26 @@ void renderCell(Window *window, int row, int col) {
   VTermScreenCell cell;
   vterm_screen_get_cell(vts, pos, &cell);
 
+  bool needsReset = false;
+
+  if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
+    printf("\033[48;5;%dm", cell.bg.indexed.idx);
+    needsReset = true;
+  } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
+    printf("\033[48;2;%d;%d;%dm", cell.bg.rgb.red, cell.bg.rgb.green,
+           cell.bg.rgb.blue);
+    needsReset = true;
+  }
+
+  if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
+    printf("\033[38;5;%dm", cell.fg.indexed.idx);
+    needsReset = true;
+  } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
+    printf("\033[38;2;%d;%d;%dm", cell.fg.rgb.red, cell.fg.rgb.green,
+           cell.fg.rgb.blue);
+    needsReset = true;
+  }
+
   char c = cell.chars[0];
   if (cell.width == 1 && (isalnum(c) || c == ' ' || ispunct(c))) {
     printf("%c", c);
@@ -258,6 +278,10 @@ void renderCell(Window *window, int row, int col) {
     printf(" ");
   } else {
     printf("?");
+  }
+
+  if (needsReset) {
+    printf("\033[0m");
   }
 }
 
