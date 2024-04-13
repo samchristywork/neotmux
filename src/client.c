@@ -76,7 +76,7 @@ void renderCell(VTermScreenCell cell) {
   }
 }
 
-void renderScreen(Window *windows, int activeTerm, int rows, int cols) {
+void renderScreen(Window *windows, int nWindows, int activeTerm, int rows, int cols) {
   printf("\033[H"); // Move cursor to top left
 
   VTermPos cursorPos;
@@ -91,7 +91,7 @@ void renderScreen(Window *windows, int activeTerm, int rows, int cols) {
         printf("\033[7m");
       }
       bool isRendered = false;
-      for (int k = 0; k < 2; k++) {
+      for (int k = 0; k < nWindows; k++) {
         if (isInRect(row, col,
               windows[k].row, windows[k].col, windows[k].height, windows[k].width
               )) {

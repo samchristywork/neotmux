@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
 #include <vterm.h>
@@ -54,7 +55,9 @@ int main() {
   windows[1].vt = NULL;
   windows[1].vts = NULL;
 
-  for (int i = 0; i < 2; i++) {
+  int nWindows = 2;
+
+  for (int i = 0; i < nWindows; i++) {
     struct winsize ws;
     ws.ws_col = windows[i].width;
     ws.ws_row = windows[i].height;
@@ -73,9 +76,7 @@ int main() {
       execlp(shell, shell, (char *)NULL);
       exit(EXIT_FAILURE);
     }
-  }
 
-  for (int i = 0; i < 2; i++) {
     initScreen(&windows[i].vt, &windows[i].vts, windows[i].height,
                windows[i].width);
   }
@@ -94,11 +95,13 @@ int main() {
   while (true) {
     fd_set inFds;
     FD_ZERO(&inFds);
-    FD_SET(STDIN_FILENO, &inFds);
-    FD_SET(windows[0].process, &inFds);
-    FD_SET(windows[1].process, &inFds);
+    FD_SET(fifo_fd, &inFds);
+    for (int k = 0; k < nWindows; k++) {
+      FD_SET(windows[k].process, &inFds);
+    }
 
-    if (select(windows[1].process + 1, &inFds, NULL, NULL, NULL) == -1) {
+    if (select(fifo_fd + 1, &inFds, NULL, NULL, NULL) ==
+        -1) {
       exit(EXIT_FAILURE);
     }
 
@@ -125,26 +128,16 @@ int main() {
       }
     }
 
-    if (FD_ISSET(windows[0].process, &inFds)) {
-      ssize_t numRead = read(windows[0].process, buf, BUF_SIZE);
-      if (numRead <= 0) {
-        exit(EXIT_SUCCESS);
+    for (int k = 0; k < nWindows; k++) {
+      if (FD_ISSET(windows[k].process, &inFds)) {
+        ssize_t numRead = read(windows[k].process, buf, BUF_SIZE);
+        if (numRead <= 0) {
+          exit(EXIT_SUCCESS);
+        }
+
+        vterm_input_write(windows[k].vt, buf, numRead);
       }
-
-      vterm_input_write(windows[0].vt, buf, numRead);
     }
-
-    if (FD_ISSET(windows[1].process, &inFds)) {
-      ssize_t numRead = read(windows[1].process, buf, BUF_SIZE);
-      if (numRead <= 0) {
-        exit(EXIT_SUCCESS);
-      }
-
-      vterm_input_write(windows[1].vt, buf, numRead);
-    }
-
-    renderScreen(windows, activeTerm, ws.ws_row, ws.ws_col);
   }
-
-  exit(EXIT_SUCCESS);
+  // vterm_free(vt);
 }

@@ -24,6 +24,6 @@ void normalScreen();
 
 struct termios ttySetRaw();
 
-void renderScreen(Window *windows, int activeTerm, int rows, int cols);
+void renderScreen(Window *windows, int nWindows, int activeTerm, int rows, int cols);
 
 #endif
