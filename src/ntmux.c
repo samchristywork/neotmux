@@ -253,4 +253,57 @@ void renderCell(Window *window, int row, int col) {
 }
 
 int main() {
+  if (tcgetattr(STDIN_FILENO, &oldTermios) == -1) {
+    exit(EXIT_FAILURE);
+  }
+
+  struct winsize ws;
+  if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) < 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  Window windows[2];
+  windows[0].process = -1;
+  windows[0].rect = malloc(sizeof(Rect));
+  windows[0].rect->width = ws.ws_col;
+  windows[0].rect->height = ws.ws_row / 2;
+  windows[0].rect->col = 0;
+  windows[0].rect->row = 0;
+  windows[0].shell = "/usr/bin/fish";
+  windows[0].vt = NULL;
+  windows[0].vts = NULL;
+
+  windows[1].process = -1;
+  windows[1].rect = malloc(sizeof(Rect));
+  windows[1].rect->width = ws.ws_col;
+  windows[1].rect->height = ws.ws_row / 2-1;
+  windows[1].rect->col = 0;
+  windows[1].rect->row = ws.ws_row / 2 + 1;
+  windows[1].shell = "/usr/bin/bash";
+  windows[1].vt = NULL;
+  windows[1].vts = NULL;
+
+  for (int i = 0; i < 2; i++) {
+    struct winsize ws;
+    ws.ws_col = windows[i].rect->width;
+    ws.ws_row = windows[i].rect->height;
+    ws.ws_xpixel = 0;
+    ws.ws_ypixel = 0;
+
+    char childName[MAX_NAME];
+    pid_t childPid = ptyFork(&windows[i].process, childName, MAX_NAME, &ws);
+    if (childPid == -1) {
+      exit(EXIT_FAILURE);
+    }
+
+    if (childPid == 0) { // Child
+      execlp(windows[i].shell, windows[i].shell, (char *)NULL);
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  for (int i = 0; i < 2; i++) {
+    initScreen(&windows[i].vt, &windows[i].vts, windows[i].rect->height,
+               windows[i].rect->width);
+  }
 }
