@@ -349,5 +349,92 @@ int main() {
   alternateScreen();
   makeCursorInvisible();
 
+  int activeTerm = 0;
+
+  while (true) {
+    fd_set inFds;
+    FD_ZERO(&inFds);
+    FD_SET(STDIN_FILENO, &inFds);
+    FD_SET(windows[0].process, &inFds);
+    FD_SET(windows[1].process, &inFds);
+
+    if (select(windows[1].process + 1, &inFds, NULL, NULL, NULL) == -1) {
+      exit(EXIT_FAILURE);
+    }
+
+    char buf[BUF_SIZE];
+    if (FD_ISSET(STDIN_FILENO, &inFds)) {
+      ssize_t numRead = read(STDIN_FILENO, buf, BUF_SIZE);
+      if (numRead <= 0) {
+        exit(EXIT_SUCCESS);
+      }
+
+      lastWrittenLen = numRead;
+      strncpy(lastWritten, buf, numRead);
+
+      if (lastWrittenLen == 3 && lastWritten[0] == 27 && lastWritten[1] == 91 &&
+          lastWritten[2] == 67) {
+        activeTerm = 1;
+      } else if (lastWrittenLen == 3 && lastWritten[0] == 27 &&
+                 lastWritten[1] == 91 && lastWritten[2] == 68) {
+        activeTerm = 0;
+      } else {
+        if (write(windows[activeTerm].process, buf, numRead) != numRead) {
+          exit(EXIT_FAILURE);
+        }
+      }
+    }
+
+    if (FD_ISSET(windows[0].process, &inFds)) {
+      ssize_t numRead = read(windows[0].process, buf, BUF_SIZE);
+      if (numRead <= 0) {
+        exit(EXIT_SUCCESS);
+      }
+
+      vterm_input_write(windows[0].vt, buf, numRead);
+    }
+
+    if (FD_ISSET(windows[1].process, &inFds)) {
+      ssize_t numRead = read(windows[1].process, buf, BUF_SIZE);
+      if (numRead <= 0) {
+        exit(EXIT_SUCCESS);
+      }
+
+      vterm_input_write(windows[1].vt, buf, numRead);
+    }
+
+    printf("\033[H"); // Move cursor to top left
+
+    VTermPos cursorPos;
+    vterm_state_get_cursorpos(vterm_obtain_state(windows[activeTerm].vt), &cursorPos);
+
+    for (int row = 0; row < ws.ws_row - 1; row++) {
+      // printf("\033[K"); // Clear line
+      for (int col = 0; col < ws.ws_col; col++) {
+        if (cursorPos.row == row - windows[activeTerm].rect->row &&
+            cursorPos.col == col - windows[activeTerm].rect->col) {
+          printf("\033[7m");
+        }
+        bool isRendered = false;
+        for (int k = 0; k < 2; k++) {
+          if (isInRect(row, col, windows[k].rect)) {
+            renderCell(&windows[k], row - windows[k].rect->row,
+                       col - windows[k].rect->col);
+            isRendered = true;
+            break;
+          }
+        }
+        if (!isRendered) {
+          printf("?");
+        }
+        if (cursorPos.row == row - windows[activeTerm].rect->row &&
+            cursorPos.col == col - windows[activeTerm].rect->col) {
+          printf("\033[0m");
+        }
+      }
+      printf("\r\n");
+    }
+  }
+
   exit(EXIT_SUCCESS);
 }
