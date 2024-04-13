@@ -37,16 +37,8 @@ struct termios ttySetRaw() {
   return oldTermios;
 }
 
-bool isInRect(int row, int col, Rect *rect) {
-  if (row < rect->row || row >= rect->row + rect->height) {
-    return false;
-  }
-
-  if (col < rect->col || col >= rect->col + rect->width) {
-    return false;
-  }
-
-  return true;
+bool isInRect(int row, int col, int rowRect, int colRect, int height, int width) {
+  return row >= rowRect && row < rowRect + height && col >= colRect && col < colRect + width;
 }
 
 void renderCell(VTermScreenCell cell) {
@@ -81,5 +73,48 @@ void renderCell(VTermScreenCell cell) {
 
   if (needsReset) {
     printf("\033[0m");
+  }
+}
+
+void renderScreen(Window *windows, int activeTerm, int rows, int cols) {
+  printf("\033[H"); // Move cursor to top left
+
+  VTermPos cursorPos;
+  vterm_state_get_cursorpos(vterm_obtain_state(windows[activeTerm].vt),
+                            &cursorPos);
+
+  for (int row = 0; row < rows - 1; row++) {
+    // printf("\033[K"); // Clear line
+    for (int col = 0; col < cols; col++) {
+      if (cursorPos.row == row - windows[activeTerm].row &&
+          cursorPos.col == col - windows[activeTerm].col) {
+        printf("\033[7m");
+      }
+      bool isRendered = false;
+      for (int k = 0; k < 2; k++) {
+        if (isInRect(row, col,
+              windows[k].row, windows[k].col, windows[k].height, windows[k].width
+              )) {
+          VTermPos pos;
+          pos.row = row - windows[k].row;
+          pos.col = col - windows[k].col;
+          VTermScreen *vts = windows[k].vts;
+
+          VTermScreenCell cell;
+          vterm_screen_get_cell(vts, pos, &cell);
+          renderCell(cell);
+          isRendered = true;
+          break;
+        }
+      }
+      if (!isRendered) {
+        printf("?");
+      }
+      if (cursorPos.row == row - windows[activeTerm].row &&
+          cursorPos.col == col - windows[activeTerm].col) {
+        printf("\033[0m");
+      }
+    }
+    printf("\r\n");
   }
 }

@@ -18,14 +18,6 @@ struct termios oldTermios;
 char lastWritten[BUF_SIZE];
 size_t lastWrittenLen = 0;
 
-typedef struct Window {
-  int process;
-  char *shell;
-  VTerm *vt;
-  VTermScreen *vts;
-  Rect *rect;
-} Window;
-
 static void ttyReset() {
   if (tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios) == -1) {
     exit(EXIT_FAILURE);
@@ -47,29 +39,25 @@ int main() {
 
   Window windows[2];
   windows[0].process = -1;
-  windows[0].rect = malloc(sizeof(Rect));
-  windows[0].rect->width = ws.ws_col;
-  windows[0].rect->height = ws.ws_row / 2;
-  windows[0].rect->col = 0;
-  windows[0].rect->row = 0;
-  windows[0].shell = "/usr/bin/fish";
+  windows[0].width = ws.ws_col;
+  windows[0].height = ws.ws_row / 2;
+  windows[0].col = 0;
+  windows[0].row = 0;
   windows[0].vt = NULL;
   windows[0].vts = NULL;
 
   windows[1].process = -1;
-  windows[1].rect = malloc(sizeof(Rect));
-  windows[1].rect->width = ws.ws_col;
-  windows[1].rect->height = ws.ws_row / 2 - 1;
-  windows[1].rect->col = 0;
-  windows[1].rect->row = ws.ws_row / 2 + 1;
-  windows[1].shell = "/usr/bin/bash";
+  windows[1].width = ws.ws_col;
+  windows[1].height = ws.ws_row / 2 - 1;
+  windows[1].col = 0;
+  windows[1].row = ws.ws_row / 2 + 1;
   windows[1].vt = NULL;
   windows[1].vts = NULL;
 
   for (int i = 0; i < 2; i++) {
     struct winsize ws;
-    ws.ws_col = windows[i].rect->width;
-    ws.ws_row = windows[i].rect->height;
+    ws.ws_col = windows[i].width;
+    ws.ws_row = windows[i].height;
     ws.ws_xpixel = 0;
     ws.ws_ypixel = 0;
 
@@ -81,14 +69,15 @@ int main() {
     }
 
     if (childPid == 0) { // Child
-      execlp(windows[i].shell, windows[i].shell, (char *)NULL);
+      char *shell = getenv("SHELL");
+      execlp(shell, shell, (char *)NULL);
       exit(EXIT_FAILURE);
     }
   }
 
   for (int i = 0; i < 2; i++) {
-    initScreen(&windows[i].vt, &windows[i].vts, windows[i].rect->height,
-               windows[i].rect->width);
+    initScreen(&windows[i].vt, &windows[i].vts, windows[i].height,
+               windows[i].width);
   }
 
   oldTermios = ttySetRaw();
@@ -154,44 +143,7 @@ int main() {
       vterm_input_write(windows[1].vt, buf, numRead);
     }
 
-    printf("\033[H"); // Move cursor to top left
-
-    VTermPos cursorPos;
-    vterm_state_get_cursorpos(vterm_obtain_state(windows[activeTerm].vt),
-                              &cursorPos);
-
-    for (int row = 0; row < ws.ws_row - 1; row++) {
-      // printf("\033[K"); // Clear line
-      for (int col = 0; col < ws.ws_col; col++) {
-        if (cursorPos.row == row - windows[activeTerm].rect->row &&
-            cursorPos.col == col - windows[activeTerm].rect->col) {
-          printf("\033[7m");
-        }
-        bool isRendered = false;
-        for (int k = 0; k < 2; k++) {
-          if (isInRect(row, col, windows[k].rect)) {
-            VTermPos pos;
-            pos.row = row - windows[k].rect->row;
-            pos.col = col - windows[k].rect->col;
-            VTermScreen *vts = windows[k].vts;
-
-            VTermScreenCell cell;
-            vterm_screen_get_cell(vts, pos, &cell);
-            renderCell(cell);
-            isRendered = true;
-            break;
-          }
-        }
-        if (!isRendered) {
-          printf("?");
-        }
-        if (cursorPos.row == row - windows[activeTerm].rect->row &&
-            cursorPos.col == col - windows[activeTerm].rect->col) {
-          printf("\033[0m");
-        }
-      }
-      printf("\r\n");
-    }
+    renderScreen(windows, activeTerm, ws.ws_row, ws.ws_col);
   }
 
   exit(EXIT_SUCCESS);

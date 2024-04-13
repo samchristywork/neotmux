@@ -4,12 +4,15 @@
 #include <stdbool.h>
 #include <vterm.h>
 
-typedef struct Rect {
+typedef struct Window {
+  int process;
+  VTerm *vt;
+  VTermScreen *vts;
   int width;
   int height;
   int col;
   int row;
-} Rect;
+} Window;
 
 void makeCursorInvisible();
 
@@ -21,8 +24,6 @@ void normalScreen();
 
 struct termios ttySetRaw();
 
-bool isInRect(int row, int col, Rect *rect);
-
-void renderCell(VTermScreenCell cell);
+void renderScreen(Window *windows, int activeTerm, int rows, int cols);
 
 #endif
