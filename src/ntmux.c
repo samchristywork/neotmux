@@ -156,5 +156,28 @@ pid_t ptyFork(int *parentFd, char *childName, size_t len,
   return 0;
 }
 
+void initScreen(VTerm **vt, VTermScreen **vts, int h, int w) {
+  *vt = vterm_new(h, w);
+  if (!vt) {
+    exit(EXIT_FAILURE);
+  }
+
+  *vts = vterm_obtain_screen(*vt);
+
+  static VTermScreenCallbacks callbacks;
+  callbacks.damage = NULL;
+  callbacks.moverect = NULL;
+  callbacks.movecursor = NULL;
+  callbacks.settermprop = NULL;
+  callbacks.bell = NULL;
+  callbacks.resize = NULL;
+  callbacks.sb_pushline = NULL;
+  callbacks.sb_popline = NULL;
+
+  vterm_screen_reset(*vts, 1);
+  vterm_screen_enable_altscreen(*vts, 1);
+  vterm_screen_set_callbacks(*vts, &callbacks, NULL);
+}
+
 int main() {
 }
