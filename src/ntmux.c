@@ -210,5 +210,47 @@ void printCellInfo(VTermScreenCell cell) {
   printColor("  BG:\r\n", &cell.bg);
 }
 
+void printLastWritten() {
+  printf("len: %ld\r\n", lastWrittenLen);
+  for (size_t i = 0; i < lastWrittenLen; i++) {
+    if (isprint(lastWritten[i])) {
+      printf("%c", lastWritten[i]);
+    } else {
+      printf("\\x%02x", lastWritten[i]);
+    }
+  }
+}
+
+bool isInRect(int row, int col, Rect *rect) {
+  if (row < rect->row || row >= rect->row + rect->height) {
+    return false;
+  }
+
+  if (col < rect->col || col >= rect->col + rect->width) {
+    return false;
+  }
+
+  return true;
+}
+
+void renderCell(Window *window, int row, int col) {
+  VTermPos pos;
+  pos.row = row;
+  pos.col = col;
+  VTermScreen *vts = window->vts;
+
+  VTermScreenCell cell;
+  vterm_screen_get_cell(vts, pos, &cell);
+
+  char c = cell.chars[0];
+  if (cell.width == 1 && (isalnum(c) || c == ' ' || ispunct(c))) {
+    printf("%c", c);
+  } else if (c == 0) {
+    printf(" ");
+  } else {
+    printf("?");
+  }
+}
+
 int main() {
 }
