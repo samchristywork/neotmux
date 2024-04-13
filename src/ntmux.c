@@ -156,6 +156,15 @@ pid_t ptyFork(int *parentFd, char *childName, size_t len,
   return 0;
 }
 
+static void ttyReset() {
+  if (tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios) == -1) {
+    exit(EXIT_FAILURE);
+  }
+
+  makeCursorVisible();
+  normalScreen();
+}
+
 void initScreen(VTerm **vt, VTermScreen **vts, int h, int w) {
   *vt = vterm_new(h, w);
   if (!vt) {
@@ -306,4 +315,15 @@ int main() {
     initScreen(&windows[i].vt, &windows[i].vts, windows[i].rect->height,
                windows[i].rect->width);
   }
+
+  ttySetRaw();
+
+  if (atexit(ttyReset) != 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  alternateScreen();
+  makeCursorInvisible();
+
+  exit(EXIT_SUCCESS);
 }
