@@ -12,18 +12,12 @@ typedef struct Window {
   int height;
   int col;
   int row;
+  bool closed;
 } Window;
-
-void makeCursorInvisible();
-
-void makeCursorVisible();
-
-void alternateScreen();
-
-void normalScreen();
 
 struct termios ttySetRaw();
 
-void renderScreen(Window *windows, int nWindows, int activeTerm, int rows, int cols);
+void renderScreen(int fifo, Window *windows, int nWindows, int activeTerm,
+                  int rows, int cols);
 
 #endif
