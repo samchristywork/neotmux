@@ -1,19 +1,18 @@
+#include <client.h>
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <termios.h>
 #include <unistd.h>
 #include <vterm.h>
-#include <client.h>
 
-void makeCursorInvisible() { printf("\033[?25l"); }
+#define BUF_SIZE 256
 
-void makeCursorVisible() { printf("\033[?25h"); }
+enum BarPosition { TOP, BOTTOM };
 
-void alternateScreen() { printf("\033[?1049h"); }
-
-void normalScreen() { printf("\033[?1049l"); }
+int barPos = TOP;
 
 struct termios ttySetRaw() {
   struct termios t;
@@ -37,38 +36,53 @@ struct termios ttySetRaw() {
   return oldTermios;
 }
 
-bool isInRect(int row, int col, int rowRect, int colRect, int height, int width) {
-  return row >= rowRect && row < rowRect + height && col >= colRect && col < colRect + width;
+bool isInRect(int row, int col, int rowRect, int colRect, int height,
+              int width) {
+  return row >= rowRect && row < rowRect + height && col >= colRect &&
+         col < colRect + width;
 }
 
-void renderCell(VTermScreenCell cell) {
+void renderCell(int fd, VTermScreenCell cell) {
   bool needsReset = false;
 
+  if (cell.attrs.bold) {
+    write(fd, "\033[1m", 4);
+    needsReset = true;
+  }
+
   if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
-    printf("\033[48;5;%dm", cell.bg.indexed.idx);
+    char buf[BUF_SIZE];
+    int n = snprintf(buf, BUF_SIZE, "\033[48;5;%dm", cell.bg.indexed.idx);
+    write(fd, buf, n);
     needsReset = true;
   } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
-    printf("\033[48;2;%d;%d;%dm", cell.bg.rgb.red, cell.bg.rgb.green,
-           cell.bg.rgb.blue);
+    char buf[BUF_SIZE];
+    int n = snprintf(buf, BUF_SIZE, "\033[48;2;%d;%d;%dm", cell.bg.rgb.red,
+                     cell.bg.rgb.green, cell.bg.rgb.blue);
+    write(fd, buf, n);
     needsReset = true;
   }
 
   if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
-    printf("\033[38;5;%dm", cell.fg.indexed.idx);
+    char buf[BUF_SIZE];
+    int n = snprintf(buf, BUF_SIZE, "\033[38;5;%dm", cell.fg.indexed.idx);
+    write(fd, buf, n);
     needsReset = true;
   } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
-    printf("\033[38;2;%d;%d;%dm", cell.fg.rgb.red, cell.fg.rgb.green,
-           cell.fg.rgb.blue);
+    char buf[BUF_SIZE];
+    int n = snprintf(buf, BUF_SIZE, "\033[38;2;%d;%d;%dm", cell.fg.rgb.red,
+                     cell.fg.rgb.green, cell.fg.rgb.blue);
+    write(fd, buf, n);
     needsReset = true;
   }
 
   char c = cell.chars[0];
-  if (cell.width == 1 && (isalnum(c) || c == ' ' || ispunct(c))) {
-    printf("%c", c);
+  if (cell.width == 1 && (isalpha(c) || c == ' ' || ispunct(c) || isdigit(c))) {
+    write(fd, &c, 1);
   } else if (c == 0) {
-    printf(" ");
+    write(fd, " ", 1);
   } else {
-    printf("?");
+    write(fd, "?", 1);
   }
 
   if (needsReset) {
