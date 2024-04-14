@@ -1,7 +1,6 @@
-#ifndef CLIENT_H
-#define CLIENT_H
+#ifndef RENDER_H
+#define RENDER_H
 
-#include <stdbool.h>
 #include <vterm.h>
 
 typedef struct Window {
@@ -14,8 +13,6 @@ typedef struct Window {
   int row;
   bool closed;
 } Window;
-
-struct termios ttySetRaw();
 
 void renderScreen(int fifo, Window *windows, int nWindows, int activeTerm,
                   int rows, int cols);

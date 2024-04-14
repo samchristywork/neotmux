@@ -1,40 +1,15 @@
 #include <ctype.h>
 #include <render.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <termios.h>
 #include <unistd.h>
-#include <vterm.h>
 
-#define BUF_SIZE 256
+// TODO: Determine the correct buffer size
+#define BUF_SIZE 1024
 
 enum BarPosition { TOP, BOTTOM };
 
 int barPos = TOP;
-
-struct termios ttySetRaw() {
-  struct termios t;
-  if (tcgetattr(STDIN_FILENO, &t) == -1) {
-    exit(EXIT_FAILURE);
-  }
-
-  struct termios oldTermios = t;
-
-  t.c_lflag &= ~(ICANON | ISIG | IEXTEN | ECHO);
-  t.c_iflag &= ~(BRKINT | ICRNL | IGNBRK | IGNCR | INLCR | INPCK | ISTRIP |
-                 IXON | PARMRK);
-  t.c_oflag &= ~OPOST;
-  t.c_cc[VMIN] = 1;
-  t.c_cc[VTIME] = 0;
-
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &t) == -1) {
-    exit(EXIT_FAILURE);
-  }
-
-  return oldTermios;
-}
 
 bool isInRect(int row, int col, int rowRect, int colRect, int height,
               int width) {
