@@ -50,3 +50,39 @@ void print_cells(State *state) {
     printf("\n");
   }
 }
+
+void scroll_up(State *state) {
+  for (int row = 1; row < state->height; row++) {
+    for (int col = 0; col < state->width; col++) {
+      Cell newCell = state->cells[row * state->width + col];
+      state->cells[(row - 1) * state->width + col] = newCell;
+    }
+  }
+  for (int col = 0; col < state->width; col++) {
+    state->cells[(state->height - 1) * state->width + col].value = '.';
+  }
+  state->cursor.y--;
+}
+
+void send_input(State *state, char *input, int n) {
+  for (int i = 0; i < n; i++) {
+    int idx = state->cursor.y * state->width + state->cursor.x;
+    Cell *cursor_cell = &state->cells[idx];
+
+    if (input[i] == '\n') {
+      state->cursor.x = 0;
+      state->cursor.y++;
+    } else {
+      cursor_cell->value = input[i];
+      state->cursor.x++;
+      if (state->cursor.x == state->width) {
+        state->cursor.x = 0;
+        state->cursor.y++;
+      }
+    }
+
+    if (state->cursor.y == state->height) {
+      scroll_up(state);
+    }
+  }
+}
