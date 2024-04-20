@@ -367,6 +367,7 @@ void server() {
             exit(EXIT_SUCCESS);
           }
         } else {
+          printf("%zu bytes read\n", numRead);
           vterm_input_write(windows[k].vt, buf, numRead);
         }
 

@@ -18,51 +18,41 @@ bool isInRect(int row, int col, int rowRect, int colRect, int height,
 }
 
 void renderCell(int fd, VTermScreenCell cell) {
-  bool needsReset = false;
-
   if (cell.attrs.bold) {
     write(fd, "\033[1m", 4);
-    needsReset = true;
   }
 
   if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
     char buf[BUF_SIZE];
     int n = snprintf(buf, BUF_SIZE, "\033[48;5;%dm", cell.bg.indexed.idx);
     write(fd, buf, n);
-    needsReset = true;
   } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
     char buf[BUF_SIZE];
     int n = snprintf(buf, BUF_SIZE, "\033[48;2;%d;%d;%dm", cell.bg.rgb.red,
                      cell.bg.rgb.green, cell.bg.rgb.blue);
     write(fd, buf, n);
-    needsReset = true;
   }
 
   if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
     char buf[BUF_SIZE];
     int n = snprintf(buf, BUF_SIZE, "\033[38;5;%dm", cell.fg.indexed.idx);
     write(fd, buf, n);
-    needsReset = true;
   } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
     char buf[BUF_SIZE];
     int n = snprintf(buf, BUF_SIZE, "\033[38;2;%d;%d;%dm", cell.fg.rgb.red,
                      cell.fg.rgb.green, cell.fg.rgb.blue);
     write(fd, buf, n);
-    needsReset = true;
   }
 
   char c = cell.chars[0];
-  if (cell.width == 1 && (isalpha(c) || c == ' ' || ispunct(c) || isdigit(c))) {
-    write(fd, &c, 1);
-  } else if (c == 0) {
+  c='0'+cell.chars[1];
+  if (c == 0) {
     write(fd, " ", 1);
   } else {
-    write(fd, "?", 1);
+    write(fd, &c, 1);
   }
 
-  if (needsReset) {
-    write(fd, "\033[0m", 4);
-  }
+  write(fd, "\033[0m", 4); // Reset colors
 }
 
 void infoBar(int fd, int rows, int cols) {
@@ -149,7 +139,7 @@ void renderScreen(int fd, Window *windows, int nWindows, int activeTerm,
           pos.col = col - windows[k].col;
           VTermScreen *vts = windows[k].vts;
 
-          VTermScreenCell cell;
+          VTermScreenCell cell = {0};
           vterm_screen_get_cell(vts, pos, &cell);
           renderCell(fd, cell);
           isRendered = true;
