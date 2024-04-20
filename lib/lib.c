@@ -74,11 +74,49 @@ void reset_color_bg(int fd) {
   write(fd, "\033[49m", 5);
 }
 
-void invert_colors() { printf("\033[7m"); }
+Color last_fg = {COLOR_TYPE_NONE, 0, 0, 0};
+Color last_bg = {COLOR_TYPE_NONE, 0, 0, 0};
 
-void reset_colors() { printf("\033[0m"); }
+bool color_eq(Color a, Color b) {
+  if (a.type != b.type) {
+    return false;
+  }
+  switch (a.type) {
+    case COLOR_TYPE_INDEX:
+      return a.index == b.index;
+    case COLOR_TYPE_RGB:
+      return a.r == b.r && a.g == b.g && a.b == b.b;
+    default:
+      return true;
+  }
+}
 
-void print_cells(State *state) {
+void print_cell(int fd, Cell cell) {
+  bool reset_fg = false;
+  bool reset_bg = false;
+
+  if (!color_eq(cell.fg, last_fg)) {
+    if (last_fg.type != COLOR_TYPE_NONE) {
+      reset_color_fg(fd);
+    }
+    write_color_fg(fd, cell.fg);
+    last_fg = cell.fg;
+    reset_fg = true;
+  }
+
+  if (!color_eq(cell.bg, last_bg)) {
+    if (last_bg.type != COLOR_TYPE_NONE) {
+      reset_color_bg(fd);
+    }
+    write_color_bg(fd, cell.bg);
+    last_bg = cell.bg;
+    reset_bg = true;
+  }
+
+  write(fd, &cell.value, 1);
+}
+
+void print_cells(int fd, State *state) {
   for (int row = 0; row < state->height; row++) {
     for (int col = 0; col < state->width; col++) {
       if (state->cursor.x == col && state->cursor.y == row) {
