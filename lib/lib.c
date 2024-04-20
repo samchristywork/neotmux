@@ -148,7 +148,25 @@ void print_cells(int fd, State *state) {
         print_cell(fd, state->cells[row * state->width + col]);
       }
     }
-    printf("\n");
+
+    if (last_fg.type != COLOR_TYPE_NONE) {
+      reset_color_fg(fd);
+    }
+
+    if (last_bg.type != COLOR_TYPE_NONE) {
+      reset_color_bg(fd);
+    }
+
+    write(fd, ";", 1);
+    write(fd, "\n", 1);
+
+    if (last_fg.type != COLOR_TYPE_NONE) {
+      write_color_fg(fd, last_fg);
+    }
+
+    if (last_bg.type != COLOR_TYPE_NONE) {
+      write_color_bg(fd, last_bg);
+    }
   }
 }
 
