@@ -1,15 +1,20 @@
+#include <fcntl.h>
 #include <lib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 void init_cell(Cell *cell) {
-  cell->value = '?';
-  cell->fg.type = 0;
+  cell->value = ' ';
+
+  cell->fg.type = COLOR_TYPE_NONE,
   cell->fg.index = 0;
   cell->fg.r = 0;
   cell->fg.g = 0;
   cell->fg.b = 0;
-  cell->bg.type = 0;
+
+  cell->bg.type = COLOR_TYPE_NONE,
   cell->bg.index = 0;
   cell->bg.r = 0;
   cell->bg.g = 0;
@@ -25,12 +30,49 @@ State *create_state(int width, int height) {
   state->cells = malloc(sizeof(Cell) * width * height);
   for (int i = 0; i < width * height; i++) {
     init_cell(&state->cells[i]);
-    state->cells[i].value = '.';
   }
   return state;
 }
 
-void print_cell(Cell cell) { printf("%c", cell.value); }
+void write_color_fg(int fd, Color color) {
+  char buf[16];
+  int n;
+  switch (color.type) {
+    case COLOR_TYPE_INDEX:
+      n = snprintf(buf, 16, "\033[38;5;%dm", color.index);
+      break;
+    case COLOR_TYPE_RGB:
+      n = snprintf(buf, 16, "\033[38;2;%d;%d;%dm", color.r, color.g, color.b);
+      break;
+    default:
+      return;
+  }
+  write(fd, buf, n);
+}
+
+void write_color_bg(int fd, Color color) {
+  char buf[16];
+  int n;
+  switch (color.type) {
+    case COLOR_TYPE_INDEX:
+      n = snprintf(buf, 16, "\033[48;5;%dm", color.index);
+      break;
+    case COLOR_TYPE_RGB:
+      n = snprintf(buf, 16, "\033[48;2;%d;%d;%dm", color.r, color.g, color.b);
+      break;
+    default:
+      return;
+  }
+  write(fd, buf, n);
+}
+
+void reset_color_fg(int fd) {
+  write(fd, "\033[39m", 5);
+}
+
+void reset_color_bg(int fd) {
+  write(fd, "\033[49m", 5);
+}
 
 void invert_colors() { printf("\033[7m"); }
 

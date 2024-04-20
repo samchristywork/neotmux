@@ -2,8 +2,8 @@
 #define LIB_H
 
 enum {
-  COLOR_TYPE_DEFAULT,
-  COLOR_TYPE_256,
+  COLOR_TYPE_NONE,
+  COLOR_TYPE_INDEX,
   COLOR_TYPE_RGB,
 };
 
@@ -34,8 +34,7 @@ typedef struct State {
 } State;
 
 State *create_state(int width, int height);
-void print_cell(Cell cell);
-void print_cells(State *state);
+void print_cells(int fd, State *state);
 void send_input(State *state, char *input, int n);
 
 #endif
