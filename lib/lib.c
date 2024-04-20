@@ -116,15 +116,36 @@ void print_cell(int fd, Cell cell) {
   write(fd, &cell.value, 1);
 }
 
+void invert_colors(int fd) {
+  write(fd, "\033[7m", 4);
+}
+
+void reset_colors(int fd) {
+  write(fd, "\033[0m", 4);
+}
+
+void clear_screen(State *state) {
+  for (int i = 0; i < state->width * state->height; i++) {
+    init_cell(&state->cells[i]);
+    state->cells[i].value = ' ';
+  }
+}
+
+void clear_line(State *state) {
+  for (int col = 0; col < state->width; col++) {
+    state->cells[state->cursor.y * state->width + col].value = ' ';
+  }
+}
+
 void print_cells(int fd, State *state) {
   for (int row = 0; row < state->height; row++) {
     for (int col = 0; col < state->width; col++) {
       if (state->cursor.x == col && state->cursor.y == row) {
-        invert_colors();
-        print_cell(state->cells[row * state->width + col]);
-        reset_colors();
+        invert_colors(fd);
+        print_cell(fd, state->cells[row * state->width + col]);
+        reset_colors(fd);
       } else {
-        print_cell(state->cells[row * state->width + col]);
+        print_cell(fd, state->cells[row * state->width + col]);
       }
     }
     printf("\n");
