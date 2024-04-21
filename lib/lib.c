@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <fcntl.h>
 #include <lib.h>
 #include <stdbool.h>
@@ -181,6 +182,15 @@ void scroll_up(State *state) {
   state->cursor.y--;
 }
 
+int read_number(char *input, int *i) {
+  int number = 0;
+  while (isdigit(input[*i])) {
+    number = number * 10 + (input[*i] - '0');
+    (*i)++;
+  }
+  return number;
+}
+
 void send_input(State *state, char *input, int n) {
   for (int i = 0; i < n; i++) {
     int idx = state->cursor.y * state->width + state->cursor.x;
@@ -190,90 +200,48 @@ void send_input(State *state, char *input, int n) {
       i+=2;
       if (input[i]=='0' && input[i+1]=='m') {
         cursor_cell->fg.type = COLOR_TYPE_NONE;
-        cursor_cell->bg.type = COLOR_TYPE_NONE;
         current_fg.type = COLOR_TYPE_NONE;
+        cursor_cell->bg.type = COLOR_TYPE_NONE;
         current_bg.type = COLOR_TYPE_NONE;
         i++;
       } else if (input[i]=='3' && input[i+1]=='8' && input[i+2]==';' && input[i+3]=='5' && input[i+4]==';') {
         i+=5;
-        int color = 0;
-        while (input[i] != 'm') {
-          color = color * 10 + (input[i] - '0');
-          i++;
-        }
+        int color = read_number(input, &i);
         cursor_cell->fg.type = COLOR_TYPE_INDEX;
         cursor_cell->fg.index = color;
-
         current_fg.type = COLOR_TYPE_INDEX;
         current_fg.index = color;
       } else if (input[i]=='4' && input[i+1]=='8' && input[i+2]==';' && input[i+3]=='5' && input[i+4]==';') {
         i+=5;
-        int color = 0;
-        while (input[i] != 'm') {
-          color = color * 10 + (input[i] - '0');
-          i++;
-        }
+        int color = read_number(input, &i);
         cursor_cell->bg.type = COLOR_TYPE_INDEX;
         cursor_cell->bg.index = color;
-
         current_bg.type = COLOR_TYPE_INDEX;
         current_bg.index = color;
       } else if (input[i]=='3' && input[i+1]=='8' && input[i+2]==';' && input[i+3]=='2' && input[i+4]==';') {
         i+=5;
-        int r = 0;
-        while (input[i] != ';') {
-          r = r * 10 + (input[i] - '0');
-          i++;
-        }
+        int r = read_number(input, &i);
         i++;
-        int g = 0;
-        while (input[i] != ';') {
-          g = g * 10 + (input[i] - '0');
-          i++;
-        }
+        int g = read_number(input, &i);
         i++;
-        int b = 0;
-        while (input[i] != 'm') {
-          b = b * 10 + (input[i] - '0');
-          i++;
-        }
+        int b = read_number(input, &i);
         cursor_cell->fg.type = COLOR_TYPE_RGB;
         cursor_cell->fg.r = r;
         cursor_cell->fg.g = g;
         cursor_cell->fg.b = b;
-
-        current_fg.type = COLOR_TYPE_RGB;
-        current_fg.r = r;
-        current_fg.g = g;
-        current_fg.b = b;
+        current_fg=cursor_cell->fg;
       } else if (input[i]=='4' && input[i+1]=='8' && input[i+2]==';' && input[i+3]=='2' && input[i+4]==';') {
         i+=5;
-        int r = 0;
-        while (input[i] != ';') {
-          r = r * 10 + (input[i] - '0');
-          i++;
-        }
+        int r = read_number(input, &i);
         i++;
-        int g = 0;
-        while (input[i] != ';') {
-          g = g * 10 + (input[i] - '0');
-          i++;
-        }
+        int g = read_number(input, &i);
         i++;
-        int b = 0;
-        while (input[i] != 'm') {
-          b = b * 10 + (input[i] - '0');
-          i++;
-        }
+        int b = read_number(input, &i);
         cursor_cell->bg.type = COLOR_TYPE_RGB;
         cursor_cell->bg.r = r;
         cursor_cell->bg.g = g;
         cursor_cell->bg.b = b;
-
-        current_bg.type = COLOR_TYPE_RGB;
-        current_bg.r = r;
-        current_bg.g = g;
-        current_bg.b = b;
+        current_bg=cursor_cell->bg;
       } else if (input[i]=='H') {
         state->cursor.x = 0;
         state->cursor.y = 0;
@@ -293,19 +261,8 @@ void send_input(State *state, char *input, int n) {
       state->cursor.y++;
     } else if (input[i] >= 32 && input[i] < 127) {
       cursor_cell->value = input[i];
-
-      cursor_cell->fg.type = current_fg.type;
-      cursor_cell->fg.index = current_fg.index;
-      cursor_cell->fg.r = current_fg.r;
-      cursor_cell->fg.g = current_fg.g;
-      cursor_cell->fg.b = current_fg.b;
-
-      cursor_cell->bg.type = current_bg.type;
-      cursor_cell->bg.index = current_bg.index;
-      cursor_cell->bg.r = current_bg.r;
-      cursor_cell->bg.g = current_bg.g;
-      cursor_cell->bg.b = current_bg.b;
-
+      cursor_cell->fg = current_fg;
+      cursor_cell->bg = current_bg;
       state->cursor.x++;
       if (state->cursor.x == state->width) {
         state->cursor.x = 0;
