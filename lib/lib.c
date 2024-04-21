@@ -5,6 +5,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+Color last_fg = {COLOR_TYPE_NONE, 0, 0, 0};
+Color last_bg = {COLOR_TYPE_NONE, 0, 0, 0};
+
+Color current_fg = {COLOR_TYPE_NONE, 0, 0, 0};
+Color current_bg = {COLOR_TYPE_NONE, 0, 0, 0};
+
 void init_cell(Cell *cell) {
   cell->value = ' ';
 
@@ -74,9 +80,6 @@ void reset_color_bg(int fd) {
   write(fd, "\033[49m", 5);
 }
 
-Color last_fg = {COLOR_TYPE_NONE, 0, 0, 0};
-Color last_bg = {COLOR_TYPE_NONE, 0, 0, 0};
-
 bool color_eq(Color a, Color b) {
   if (a.type != b.type) {
     return false;
@@ -92,16 +95,12 @@ bool color_eq(Color a, Color b) {
 }
 
 void print_cell(int fd, Cell cell) {
-  bool reset_fg = false;
-  bool reset_bg = false;
-
   if (!color_eq(cell.fg, last_fg)) {
     if (last_fg.type != COLOR_TYPE_NONE) {
       reset_color_fg(fd);
     }
     write_color_fg(fd, cell.fg);
     last_fg = cell.fg;
-    reset_fg = true;
   }
 
   if (!color_eq(cell.bg, last_bg)) {
@@ -110,7 +109,6 @@ void print_cell(int fd, Cell cell) {
     }
     write_color_bg(fd, cell.bg);
     last_bg = cell.bg;
-    reset_bg = true;
   }
 
   write(fd, &cell.value, 1);
@@ -188,16 +186,53 @@ void send_input(State *state, char *input, int n) {
     int idx = state->cursor.y * state->width + state->cursor.x;
     Cell *cursor_cell = &state->cells[idx];
 
-    if (input[i] == '\n') {
+    if (input[i] == '\033' && input[i + 1] == '[') {
+      i+=2;
+      if (input[i]=='0' && input[i+1]=='m') {
+        cursor_cell->fg.type = COLOR_TYPE_NONE;
+        cursor_cell->bg.type = COLOR_TYPE_NONE;
+        current_fg.type = COLOR_TYPE_NONE;
+        current_bg.type = COLOR_TYPE_NONE;
+        i++;
+      } else if (input[i]=='H') {
+        state->cursor.x = 0;
+        state->cursor.y = 0;
+      } else if (input[i]=='2' && input[i+1]=='J') {
+        clear_screen(state);
+        state->cursor.x = 0;
+        state->cursor.y = 0;
+      } else if (input[i]=='2' && input[i+1]=='K') {
+        clear_line(state);
+        state->cursor.x = 0;
+        i++;
+      } else {
+        fprintf(stderr, "Unknown escape sequence\n");
+      }
+    }else if (input[i] == '\n') {
       state->cursor.x = 0;
       state->cursor.y++;
-    } else {
+    } else if (input[i] >= 32 && input[i] < 127) {
       cursor_cell->value = input[i];
+
+      cursor_cell->fg.type = current_fg.type;
+      cursor_cell->fg.index = current_fg.index;
+      cursor_cell->fg.r = current_fg.r;
+      cursor_cell->fg.g = current_fg.g;
+      cursor_cell->fg.b = current_fg.b;
+
+      cursor_cell->bg.type = current_bg.type;
+      cursor_cell->bg.index = current_bg.index;
+      cursor_cell->bg.r = current_bg.r;
+      cursor_cell->bg.g = current_bg.g;
+      cursor_cell->bg.b = current_bg.b;
+
       state->cursor.x++;
       if (state->cursor.x == state->width) {
         state->cursor.x = 0;
         state->cursor.y++;
       }
+    } else {
+      fprintf(stderr, "Unknown character\n");
     }
 
     if (state->cursor.y == state->height) {
