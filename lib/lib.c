@@ -246,6 +246,34 @@ void send_input(State *state, char *input, int n) {
         current_fg.r = r;
         current_fg.g = g;
         current_fg.b = b;
+      } else if (input[i]=='4' && input[i+1]=='8' && input[i+2]==';' && input[i+3]=='2' && input[i+4]==';') {
+        i+=5;
+        int r = 0;
+        while (input[i] != ';') {
+          r = r * 10 + (input[i] - '0');
+          i++;
+        }
+        i++;
+        int g = 0;
+        while (input[i] != ';') {
+          g = g * 10 + (input[i] - '0');
+          i++;
+        }
+        i++;
+        int b = 0;
+        while (input[i] != 'm') {
+          b = b * 10 + (input[i] - '0');
+          i++;
+        }
+        cursor_cell->bg.type = COLOR_TYPE_RGB;
+        cursor_cell->bg.r = r;
+        cursor_cell->bg.g = g;
+        cursor_cell->bg.b = b;
+
+        current_bg.type = COLOR_TYPE_RGB;
+        current_bg.r = r;
+        current_bg.g = g;
+        current_bg.b = b;
       } else if (input[i]=='H') {
         state->cursor.x = 0;
         state->cursor.y = 0;
