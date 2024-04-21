@@ -36,5 +36,6 @@ typedef struct State {
 State *create_state(int width, int height);
 void print_cells(int fd, State *state);
 void send_input(State *state, char *input, int n);
+void draw_cells(State *state, int x, int y);
 
 #endif

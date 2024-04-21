@@ -169,6 +169,54 @@ void print_cells(int fd, State *state) {
   }
 }
 
+void move_cursor_origin(int fd) {
+  write(fd, "\033[H", 3);
+}
+
+void move_cursor(int fd, int x, int y) {
+  char buf[16];
+  int n = snprintf(buf, 16, "\033[%d;%dH", y + 1, x + 1);
+  write(fd, buf, n);
+}
+
+void draw_cells(State *state, int x, int y) {
+  int fd = STDOUT_FILENO;
+
+  move_cursor_origin(fd);
+
+  move_cursor(fd, x, y);
+
+  for (int row = 0; row < state->height; row++) {
+    for (int col = 0; col < state->width; col++) {
+      if (state->cursor.x == col && state->cursor.y == row) {
+        invert_colors(fd);
+        print_cell(fd, state->cells[row * state->width + col]);
+        reset_colors(fd);
+      } else {
+        print_cell(fd, state->cells[row * state->width + col]);
+      }
+    }
+
+    if (last_fg.type != COLOR_TYPE_NONE) {
+      reset_color_fg(fd);
+    }
+
+    if (last_bg.type != COLOR_TYPE_NONE) {
+      reset_color_bg(fd);
+    }
+
+    move_cursor(fd, x, y + row + 1);
+
+    if (last_fg.type != COLOR_TYPE_NONE) {
+      write_color_fg(fd, last_fg);
+    }
+
+    if (last_bg.type != COLOR_TYPE_NONE) {
+      write_color_bg(fd, last_bg);
+    }
+  }
+}
+
 void scroll_up(State *state) {
   for (int row = 1; row < state->height; row++) {
     for (int col = 0; col < state->width; col++) {
