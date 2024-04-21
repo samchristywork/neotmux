@@ -136,17 +136,21 @@ void clear_line(State *state) {
   }
 }
 
+void print_row(int fd, State *state, int row) {
+  for (int col = 0; col < state->width; col++) {
+    if (state->cursor.x == col && state->cursor.y == row) {
+      invert_colors(fd);
+      print_cell(fd, state->cells[row * state->width + col]);
+      reset_colors(fd);
+    } else {
+      print_cell(fd, state->cells[row * state->width + col]);
+    }
+  }
+}
+
 void print_cells(int fd, State *state) {
   for (int row = 0; row < state->height; row++) {
-    for (int col = 0; col < state->width; col++) {
-      if (state->cursor.x == col && state->cursor.y == row) {
-        invert_colors(fd);
-        print_cell(fd, state->cells[row * state->width + col]);
-        reset_colors(fd);
-      } else {
-        print_cell(fd, state->cells[row * state->width + col]);
-      }
-    }
+    print_row(fd, state, row);
 
     if (last_fg.type != COLOR_TYPE_NONE) {
       reset_color_fg(fd);
@@ -187,15 +191,7 @@ void draw_cells(State *state, int x, int y) {
   move_cursor(fd, x, y);
 
   for (int row = 0; row < state->height; row++) {
-    for (int col = 0; col < state->width; col++) {
-      if (state->cursor.x == col && state->cursor.y == row) {
-        invert_colors(fd);
-        print_cell(fd, state->cells[row * state->width + col]);
-        reset_colors(fd);
-      } else {
-        print_cell(fd, state->cells[row * state->width + col]);
-      }
-    }
+    print_row(fd, state, row);
 
     if (last_fg.type != COLOR_TYPE_NONE) {
       reset_color_fg(fd);
