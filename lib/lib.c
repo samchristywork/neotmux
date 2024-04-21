@@ -15,13 +15,13 @@ Color current_bg = {COLOR_TYPE_NONE, 0, 0, 0};
 void init_cell(Cell *cell) {
   cell->value = ' ';
 
-  cell->fg.type = COLOR_TYPE_NONE,
+  cell->fg.type = COLOR_TYPE_NONE;
   cell->fg.index = 0;
   cell->fg.r = 0;
   cell->fg.g = 0;
   cell->fg.b = 0;
 
-  cell->bg.type = COLOR_TYPE_NONE,
+  cell->bg.type = COLOR_TYPE_NONE;
   cell->bg.index = 0;
   cell->bg.r = 0;
   cell->bg.g = 0;
@@ -45,14 +45,14 @@ void write_color_fg(int fd, Color color) {
   char buf[16];
   int n;
   switch (color.type) {
-    case COLOR_TYPE_INDEX:
-      n = snprintf(buf, 16, "\033[38;5;%dm", color.index);
-      break;
-    case COLOR_TYPE_RGB:
-      n = snprintf(buf, 16, "\033[38;2;%d;%d;%dm", color.r, color.g, color.b);
-      break;
-    default:
-      return;
+  case COLOR_TYPE_INDEX:
+    n = snprintf(buf, 16, "\033[38;5;%dm", color.index);
+    break;
+  case COLOR_TYPE_RGB:
+    n = snprintf(buf, 16, "\033[38;2;%d;%d;%dm", color.r, color.g, color.b);
+    break;
+  default:
+    return;
   }
   write(fd, buf, n);
 }
@@ -61,37 +61,33 @@ void write_color_bg(int fd, Color color) {
   char buf[16];
   int n;
   switch (color.type) {
-    case COLOR_TYPE_INDEX:
-      n = snprintf(buf, 16, "\033[48;5;%dm", color.index);
-      break;
-    case COLOR_TYPE_RGB:
-      n = snprintf(buf, 16, "\033[48;2;%d;%d;%dm", color.r, color.g, color.b);
-      break;
-    default:
-      return;
+  case COLOR_TYPE_INDEX:
+    n = snprintf(buf, 16, "\033[48;5;%dm", color.index);
+    break;
+  case COLOR_TYPE_RGB:
+    n = snprintf(buf, 16, "\033[48;2;%d;%d;%dm", color.r, color.g, color.b);
+    break;
+  default:
+    return;
   }
   write(fd, buf, n);
 }
 
-void reset_color_fg(int fd) {
-  write(fd, "\033[39m", 5);
-}
+void reset_color_fg(int fd) { write(fd, "\033[39m", 5); }
 
-void reset_color_bg(int fd) {
-  write(fd, "\033[49m", 5);
-}
+void reset_color_bg(int fd) { write(fd, "\033[49m", 5); }
 
 bool color_eq(Color a, Color b) {
   if (a.type != b.type) {
     return false;
   }
   switch (a.type) {
-    case COLOR_TYPE_INDEX:
-      return a.index == b.index;
-    case COLOR_TYPE_RGB:
-      return a.r == b.r && a.g == b.g && a.b == b.b;
-    default:
-      return true;
+  case COLOR_TYPE_INDEX:
+    return a.index == b.index;
+  case COLOR_TYPE_RGB:
+    return a.r == b.r && a.g == b.g && a.b == b.b;
+  default:
+    return true;
   }
 }
 
@@ -115,13 +111,9 @@ void print_cell(int fd, Cell cell) {
   write(fd, &cell.value, 1);
 }
 
-void invert_colors(int fd) {
-  write(fd, "\033[7m", 4);
-}
+void invert_colors(int fd) { write(fd, "\033[7m", 4); }
 
-void reset_colors(int fd) {
-  write(fd, "\033[0m", 4);
-}
+void reset_colors(int fd) { write(fd, "\033[0m", 4); }
 
 void clear_screen(State *state) {
   for (int i = 0; i < state->width * state->height; i++) {
@@ -173,9 +165,7 @@ void print_cells(int fd, State *state) {
   }
 }
 
-void move_cursor_origin(int fd) {
-  write(fd, "\033[H", 3);
-}
+void move_cursor_origin(int fd) { write(fd, "\033[H", 3); }
 
 void move_cursor(int fd, int x, int y) {
   char buf[16];
@@ -241,29 +231,35 @@ void send_input(State *state, char *input, int n) {
     Cell *cursor_cell = &state->cells[idx];
 
     if (input[i] == '\033' && input[i + 1] == '[') {
-      i+=2;
-      if (input[i]=='0' && input[i+1]=='m') {
+      i += 2;
+      if (input[i] == '0' && input[i + 1] == 'm') {
         cursor_cell->fg.type = COLOR_TYPE_NONE;
         current_fg.type = COLOR_TYPE_NONE;
         cursor_cell->bg.type = COLOR_TYPE_NONE;
         current_bg.type = COLOR_TYPE_NONE;
         i++;
-      } else if (input[i]=='3' && input[i+1]=='8' && input[i+2]==';' && input[i+3]=='5' && input[i+4]==';') {
-        i+=5;
+      } else if (input[i] == '3' && input[i + 1] == '8' &&
+                 input[i + 2] == ';' && input[i + 3] == '5' &&
+                 input[i + 4] == ';') {
+        i += 5;
         int color = read_number(input, &i);
         cursor_cell->fg.type = COLOR_TYPE_INDEX;
         cursor_cell->fg.index = color;
         current_fg.type = COLOR_TYPE_INDEX;
         current_fg.index = color;
-      } else if (input[i]=='4' && input[i+1]=='8' && input[i+2]==';' && input[i+3]=='5' && input[i+4]==';') {
-        i+=5;
+      } else if (input[i] == '4' && input[i + 1] == '8' &&
+                 input[i + 2] == ';' && input[i + 3] == '5' &&
+                 input[i + 4] == ';') {
+        i += 5;
         int color = read_number(input, &i);
         cursor_cell->bg.type = COLOR_TYPE_INDEX;
         cursor_cell->bg.index = color;
         current_bg.type = COLOR_TYPE_INDEX;
         current_bg.index = color;
-      } else if (input[i]=='3' && input[i+1]=='8' && input[i+2]==';' && input[i+3]=='2' && input[i+4]==';') {
-        i+=5;
+      } else if (input[i] == '3' && input[i + 1] == '8' &&
+                 input[i + 2] == ';' && input[i + 3] == '2' &&
+                 input[i + 4] == ';') {
+        i += 5;
         int r = read_number(input, &i);
         i++;
         int g = read_number(input, &i);
@@ -273,9 +269,11 @@ void send_input(State *state, char *input, int n) {
         cursor_cell->fg.r = r;
         cursor_cell->fg.g = g;
         cursor_cell->fg.b = b;
-        current_fg=cursor_cell->fg;
-      } else if (input[i]=='4' && input[i+1]=='8' && input[i+2]==';' && input[i+3]=='2' && input[i+4]==';') {
-        i+=5;
+        current_fg = cursor_cell->fg;
+      } else if (input[i] == '4' && input[i + 1] == '8' &&
+                 input[i + 2] == ';' && input[i + 3] == '2' &&
+                 input[i + 4] == ';') {
+        i += 5;
         int r = read_number(input, &i);
         i++;
         int g = read_number(input, &i);
@@ -285,22 +283,22 @@ void send_input(State *state, char *input, int n) {
         cursor_cell->bg.r = r;
         cursor_cell->bg.g = g;
         cursor_cell->bg.b = b;
-        current_bg=cursor_cell->bg;
-      } else if (input[i]=='H') {
+        current_bg = cursor_cell->bg;
+      } else if (input[i] == 'H') {
         state->cursor.x = 0;
         state->cursor.y = 0;
-      } else if (input[i]=='2' && input[i+1]=='J') {
+      } else if (input[i] == '2' && input[i + 1] == 'J') {
         clear_screen(state);
         state->cursor.x = 0;
         state->cursor.y = 0;
-      } else if (input[i]=='2' && input[i+1]=='K') {
+      } else if (input[i] == '2' && input[i + 1] == 'K') {
         clear_line(state);
         state->cursor.x = 0;
         i++;
       } else {
         fprintf(stderr, "Unknown escape sequence\n");
       }
-    }else if (input[i] == '\n') {
+    } else if (input[i] == '\n') {
       state->cursor.x = 0;
       state->cursor.y++;
     } else if (input[i] >= 32 && input[i] < 127) {

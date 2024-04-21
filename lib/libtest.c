@@ -1,8 +1,8 @@
 #include <fcntl.h>
 #include <lib.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdio.h>
 
 int get_file(const char *functionName) {
   char testName[100];
@@ -51,12 +51,12 @@ void color_test() {
 
   char *input = "Hello, World!\n";
   send_input(state, input, strlen(input));
-  for(int i=0; i<strlen("Hello"); i++){
+  for (int i = 0; i < strlen("Hello"); i++) {
     state->cells[i].fg.type = COLOR_TYPE_INDEX;
     state->cells[i].fg.index = 1;
   }
 
-  for(int i=7; i<7+strlen("World"); i++){
+  for (int i = 7; i < 7 + strlen("World"); i++) {
     state->cells[i].bg.type = COLOR_TYPE_INDEX;
     state->cells[i].bg.index = 2;
   }
@@ -85,7 +85,7 @@ void color_across_lines_test() {
 
   char *input = "This text is longer than one line.\n";
   send_input(state, input, strlen(input));
-  for(int i=0; i<strlen(input)-1; i++){
+  for (int i = 0; i < strlen(input) - 1; i++) {
     state->cells[i].bg.type = COLOR_TYPE_INDEX;
     state->cells[i].bg.index = 1;
   }
