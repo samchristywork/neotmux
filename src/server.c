@@ -51,6 +51,7 @@ void initScreen(VTerm **vt, VTermScreen **vts, int h, int w) {
   callbacks.sb_pushline = NULL;
   callbacks.sb_popline = NULL;
 
+  vterm_set_utf8(*vt, 1);
   vterm_screen_reset(*vts, 1);
   vterm_screen_enable_altscreen(*vts, 1);
   vterm_screen_set_callbacks(*vts, &callbacks, NULL);

@@ -1,8 +1,8 @@
-#include <ctype.h>
 #include <render.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <util.h>
 
 // TODO: Determine the correct buffer size
 #define BUF_SIZE 1024
@@ -44,12 +44,15 @@ void renderCell(int fd, VTermScreenCell cell) {
     write(fd, buf, n);
   }
 
-  char c = cell.chars[0];
-  c='0'+cell.chars[1];
-  if (c == 0) {
+  if (cell.chars[0] == 0) {
     write(fd, " ", 1);
   } else {
-    write(fd, &c, 1);
+    for(int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i]; i++) {
+      char bytes[6];
+      int len = fill_utf8(cell.chars[i], bytes);
+      bytes[len] = 0;
+      write(fd, bytes, strlen(bytes));
+    }
   }
 
   write(fd, "\033[0m", 4); // Reset colors
