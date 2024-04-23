@@ -1,5 +1,5 @@
 #include <fcntl.h>
-#include <lib.h>
+#include <libtermemu.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>

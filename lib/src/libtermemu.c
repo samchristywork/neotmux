@@ -1,6 +1,6 @@
 #include <ctype.h>
 #include <fcntl.h>
-#include <lib.h>
+#include <libtermemu.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
