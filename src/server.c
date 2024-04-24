@@ -152,55 +152,58 @@ pid_t ptyFork(int *parentFd, char *childName, size_t len,
   return 0;
 }
 
+void addWindow(Window **windows, int *nWindows) {
+  *windows = realloc(*windows, (*nWindows + 1) * sizeof(Window));
+  if (*windows == NULL) {
+    exit(EXIT_FAILURE);
+  }
+
+  (*windows)[*nWindows].process = -1;
+  (*windows)[*nWindows].width = 80;
+  (*windows)[*nWindows].height = 24;
+  (*windows)[*nWindows].col = 0;
+  (*windows)[*nWindows].row = 0;
+  (*windows)[*nWindows].vt = NULL;
+  (*windows)[*nWindows].vts = NULL;
+  (*windows)[*nWindows].closed = false;
+
+  (*nWindows)++;
+
+  struct winsize ws;
+  ws.ws_col = 80;
+  ws.ws_row = 24;
+  ws.ws_xpixel = 0;
+  ws.ws_ypixel = 0;
+
+  char childName[MAX_NAME];
+  pid_t childPid =
+      ptyFork(&(*windows)[*nWindows - 1].process, childName, MAX_NAME, &ws);
+  if (childPid == -1) {
+    exit(EXIT_FAILURE);
+  }
+
+  if (childPid == 0) { // Child
+    char *shell = getenv("SHELL");
+    execlp(shell, shell, (char *)NULL);
+    exit(EXIT_FAILURE);
+  }
+
+  initScreen(&(*windows)[*nWindows - 1].vt, &(*windows)[*nWindows - 1].vts,
+             (*windows)[*nWindows - 1].height, (*windows)[*nWindows - 1].width);
+}
+
 void server() {
   struct winsize ws;
   ws.ws_col = 80;
   ws.ws_row = 24;
 
-  Window windows[2];
-  windows[0].process = -1;
-  windows[0].width = ws.ws_col;
-  windows[0].height = ws.ws_row / 2;
-  windows[0].col = 0;
-  windows[0].row = 0;
-  windows[0].vt = NULL;
-  windows[0].vts = NULL;
-  windows[0].closed = false;
+  Window *windows = malloc(1);
 
-  windows[1].process = -1;
-  windows[1].width = ws.ws_col;
-  windows[1].height = ws.ws_row / 2 - 1;
-  windows[1].col = 0;
-  windows[1].row = ws.ws_row / 2 + 1;
-  windows[1].vt = NULL;
-  windows[1].vts = NULL;
-  windows[1].closed = false;
+  int nWindows = 0;
+  addWindow(&windows, &nWindows);
+  addWindow(&windows, &nWindows);
 
-  int nWindows = 2;
-
-  for (int i = 0; i < nWindows; i++) {
-    struct winsize ws;
-    ws.ws_col = windows[i].width;
-    ws.ws_row = windows[i].height;
-    ws.ws_xpixel = 0;
-    ws.ws_ypixel = 0;
-
-    char childName[MAX_NAME];
-    pid_t childPid =
-        ptyFork(&windows[i].process, childName, MAX_NAME, &ws);
-    if (childPid == -1) {
-      exit(EXIT_FAILURE);
-    }
-
-    if (childPid == 0) { // Child
-      char *shell = getenv("SHELL");
-      execlp(shell, shell, (char *)NULL);
-      exit(EXIT_FAILURE);
-    }
-
-    initScreen(&windows[i].vt, &windows[i].vts, windows[i].height,
-               windows[i].width);
-  }
+  calculateLayout(windows, nWindows, ws.ws_row, ws.ws_col);
 
   if (atexit(cleanup_server) != 0) {
     exit(EXIT_FAILURE);
