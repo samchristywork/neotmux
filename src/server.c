@@ -333,6 +333,11 @@ void server() {
         dirty = true;
 
         printf("Size set to %d %d\n", newHeight, newWidth);
+      } else if (numRead == 7 && strncmp(buf, "create\n", 7) == 0) {
+        printf("Create control sequence\n");
+        addWindow(&windows, &nWindows);
+        calculateLayout(windows, nWindows, ws.ws_row, ws.ws_col);
+        dirty = true;
       } else if (numRead == 5 && strncmp(buf, "show\n", 5) == 0) {
         printf("Show control sequence\n");
         renderScreen(outFifo_s, windows, nWindows, activeTerm, ws.ws_row,
