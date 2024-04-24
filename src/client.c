@@ -1,18 +1,21 @@
+#include <fcntl.h>
+#include <log.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <termios.h>
-#include <stdbool.h>
+#include <unistd.h>
 
-#define BUF_SIZE 256
+#define BUF_SIZE 100000
 
 int inFifo_c;
 int outFifo_c;
 int controlFifo_c;
 
 struct termios oldTermios;
+
+typedef enum { MODE_NORMAL, MODE_CONTROL } Mode;
 
 void makeCursorInvisible() { printf("\033[?25l"); }
 
@@ -118,6 +121,8 @@ void client() {
 
   write(controlFifo_c, "show\n", 5);
 
+  int mode = MODE_NORMAL;
+
   while (true) {
     fd_set inFds;
     FD_ZERO(&inFds);
@@ -138,8 +143,14 @@ void client() {
         exit(EXIT_SUCCESS);
       }
 
-      if (numRead == 1 && buf[0] == ';') {
+      if (numRead == 1 && buf[0] == 1) { // Ctrl-a
+        mode = MODE_CONTROL;
+      } else if (mode == MODE_CONTROL && buf[0] == 'c') {
+        write(controlFifo_c, "create\n", 7);
+      } else if (mode == MODE_CONTROL && buf[0] == 'q') {
         exit(EXIT_SUCCESS);
+      } else if (mode == MODE_CONTROL) {
+        mode = MODE_NORMAL;
       } else {
         if (write(inFifo_c, buf, numRead) != numRead) {
           exit(EXIT_FAILURE);
