@@ -5,11 +5,27 @@
 #include <util.h>
 
 // TODO: Determine the correct buffer size
-#define BUF_SIZE 1024
+#define BUF_SIZE 100000
 
 enum BarPosition { TOP, BOTTOM };
 
 int barPos = TOP;
+
+typedef struct BackBuffer {
+  char buffer[BUF_SIZE];
+  int n;
+} BackBuffer;
+
+BackBuffer bb;
+
+void bbWrite(const void *buf, size_t count) {
+  memcpy(bb.buffer + bb.n, buf, count);
+  bb.n += count;
+}
+
+void bbClear() {
+  bb.n = 0;
+}
 
 bool isInRect(int row, int col, int rowRect, int colRect, int height,
               int width) {
@@ -17,68 +33,68 @@ bool isInRect(int row, int col, int rowRect, int colRect, int height,
          col < colRect + width;
 }
 
-void renderCell(int fd, VTermScreenCell cell) {
+void renderCell(VTermScreenCell cell) {
   if (cell.attrs.bold) {
-    write(fd, "\033[1m", 4);
+    bbWrite("\033[1m", 4);
   }
 
   if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
     char buf[BUF_SIZE];
     int n = snprintf(buf, BUF_SIZE, "\033[48;5;%dm", cell.bg.indexed.idx);
-    write(fd, buf, n);
+    bbWrite(buf, n);
   } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
     char buf[BUF_SIZE];
     int n = snprintf(buf, BUF_SIZE, "\033[48;2;%d;%d;%dm", cell.bg.rgb.red,
                      cell.bg.rgb.green, cell.bg.rgb.blue);
-    write(fd, buf, n);
+    bbWrite(buf, n);
   }
 
   if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
     char buf[BUF_SIZE];
     int n = snprintf(buf, BUF_SIZE, "\033[38;5;%dm", cell.fg.indexed.idx);
-    write(fd, buf, n);
+    bbWrite(buf, n);
   } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
     char buf[BUF_SIZE];
     int n = snprintf(buf, BUF_SIZE, "\033[38;2;%d;%d;%dm", cell.fg.rgb.red,
                      cell.fg.rgb.green, cell.fg.rgb.blue);
-    write(fd, buf, n);
+    bbWrite(buf, n);
   }
 
   if (cell.chars[0] == 0) {
-    write(fd, " ", 1);
+    bbWrite(" ", 1);
   } else {
     for(int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i]; i++) {
       char bytes[6];
       int len = fill_utf8(cell.chars[i], bytes);
       bytes[len] = 0;
-      write(fd, bytes, strlen(bytes));
+      bbWrite(bytes, len);
     }
   }
 
-  write(fd, "\033[0m", 4); // Reset colors
+  bbWrite("\033[0m", 4); // Reset colors
 }
 
-void infoBar(int fd, int rows, int cols) {
-  write(fd, "\033[7m", 4); // Invert colors
+void infoBar(int rows, int cols) {
+  bbWrite("\033[7m", 4); // Invert colors
   char buf[BUF_SIZE];
   static int frame = 0;
   int n = snprintf(buf, BUF_SIZE, "Rows: %d, Cols: %d, Frame: %d", rows, cols,
                    frame);
   frame++;
-  write(fd, buf, n);
-  write(fd, "\033[0m", 4);
-  write(fd, "\r\n", 2);
+  bbWrite(buf, n);
+  bbWrite("\033[0m", 4);
+  bbWrite("\r\n", 2);
 }
 
-void color(int fd, int color) {
+void color(int color) {
   char buf[BUF_SIZE];
   int n = snprintf(buf, BUF_SIZE, "\033[38;5;%dm", color);
-  write(fd, buf, n);
+  bbWrite(buf, n);
 }
 
-void statusBar(int fd, int cols) {
-  write(fd, "\033[7m", 4); // Invert colors
-  color(fd, 2);
+void statusBar(int cols) {
+  bbWrite("\033[7m", 4); // Invert colors
+  color(2);
 
   int idx = 0;
   char buf[cols];
@@ -88,34 +104,36 @@ void statusBar(int fd, int cols) {
   char windowName[] = "bash";
 
   int n = snprintf(buf, cols, "[%s] ", sessionName);
-  write(fd, buf, n);
+  bbWrite(buf, n);
   idx += n;
 
   n = snprintf(buf, cols, "%d:%s*", windowIndex, windowName);
-  write(fd, buf, n);
+  bbWrite(buf, n);
   idx += n;
 
   char *statusRight = "Hello, World!";
   idx += strlen(statusRight);
 
   for (int i = idx; i < cols; i++) {
-    write(fd, " ", 1);
+    bbWrite(" ", 1);
   }
 
-  write(fd, statusRight, strlen(statusRight));
+  bbWrite(statusRight, strlen(statusRight));
 
-  write(fd, "\033[0m", 4);
-  write(fd, "\r\n", 2);
+  bbWrite("\033[0m", 4);
+  bbWrite("\r\n", 2);
 }
 
 void renderScreen(int fd, Window *windows, int nWindows, int activeTerm,
                   int rows, int cols) {
-  write(fd, "\033[H", 3); // Move cursor to top left
+  bb.n = 0;
 
-  infoBar(fd, rows, cols);
+  bbWrite("\033[H", 3); // Move cursor to top left
+
+  infoBar(rows, cols);
 
   if (barPos == TOP) {
-    statusBar(fd, cols);
+    statusBar(cols);
   }
 
   VTermPos cursorPos;
@@ -123,11 +141,10 @@ void renderScreen(int fd, Window *windows, int nWindows, int activeTerm,
                             &cursorPos);
 
   for (int row = 0; row < rows - 1; row++) {
-    // printf("\033[K"); // Clear line
     for (int col = 0; col < cols; col++) {
       if (cursorPos.row == row - windows[activeTerm].row &&
           cursorPos.col == col - windows[activeTerm].col) {
-        write(fd, "\033[7m", 4); // Invert colors
+        bbWrite("\033[7m", 4); // Invert colors
       }
       bool isRendered = false;
       for (int k = 0; k < nWindows; k++) {
@@ -144,23 +161,25 @@ void renderScreen(int fd, Window *windows, int nWindows, int activeTerm,
 
           VTermScreenCell cell = {0};
           vterm_screen_get_cell(vts, pos, &cell);
-          renderCell(fd, cell);
+          renderCell(cell);
           isRendered = true;
           break;
         }
       }
       if (!isRendered) {
-        write(fd, "?", 1);
+        bbWrite("?", 1);
       }
       if (cursorPos.row == row - windows[activeTerm].row &&
           cursorPos.col == col - windows[activeTerm].col) {
-        write(fd, "\033[0m", 4);
+        bbWrite("\033[0m", 4);
       }
     }
-    write(fd, "\r\n", 2);
+    bbWrite("\r\n", 2);
   }
 
   if (barPos == BOTTOM) {
-    statusBar(fd, cols);
+    statusBar(cols);
   }
+
+  write(fd, bb.buffer, bb.n);
 }
