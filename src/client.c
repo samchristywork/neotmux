@@ -25,13 +25,13 @@ void alternateScreen() { printf("\033[?1049h"); }
 
 void normalScreen() { printf("\033[?1049l"); }
 
-struct termios ttySetRaw() {
+void ttySetRaw() {
   struct termios t;
   if (tcgetattr(STDIN_FILENO, &t) == -1) {
     exit(EXIT_FAILURE);
   }
 
-  struct termios oldTermios = t;
+  oldTermios = t;
 
   t.c_lflag &= ~(ICANON | ISIG | IEXTEN | ECHO);
   t.c_iflag &= ~(BRKINT | ICRNL | IGNBRK | IGNCR | INLCR | INPCK | ISTRIP |
@@ -43,8 +43,6 @@ struct termios ttySetRaw() {
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &t) == -1) {
     exit(EXIT_FAILURE);
   }
-
-  return oldTermios;
 }
 
 static void cleanup_client() {
@@ -61,7 +59,8 @@ static void cleanup_client() {
 }
 
 void renderClient(int outFifo_c) {
-  char buf[BUF_SIZE];
+
+  static char buf[BUF_SIZE];
   ssize_t numRead = read(outFifo_c, buf, BUF_SIZE);
   if (numRead <= 0) {
     exit(EXIT_SUCCESS);
@@ -70,7 +69,7 @@ void renderClient(int outFifo_c) {
   write(STDOUT_FILENO, buf, numRead);
 }
 
-void client() {
+void setupFifos() {
   char *inFifoName = "/tmp/ntmux.in";
   char *outFifoName = "/tmp/ntmux.out";
   char *controlFifoName = "/tmp/ntmux.control";
@@ -94,19 +93,24 @@ void client() {
   }
 
   printf("%d %d %d\n", inFifo_c, outFifo_c, controlFifo_c);
+}
 
-  printf("Client started\n");
-
-  if (tcgetattr(STDIN_FILENO, &oldTermios) == -1) {
-    exit(EXIT_FAILURE);
-  }
+void setSize() {
 
   struct winsize ws;
   if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) < 0) {
     exit(EXIT_FAILURE);
   }
 
-  oldTermios = ttySetRaw();
+  char buf[BUF_SIZE];
+  int len = sprintf(buf, "size\n%d %d\n", ws.ws_col, ws.ws_row-2);
+  write(controlFifo_c, buf, len);
+}
+
+void client() {
+  setupFifos();
+
+  ttySetRaw();
 
   if (atexit(cleanup_client) != 0) {
     exit(EXIT_FAILURE);
@@ -115,9 +119,7 @@ void client() {
   write(STDOUT_FILENO, "\033[?1049h", 8); // Alternate screen
   write(STDOUT_FILENO, "\033[?25l", 6);   // Hide cursor
 
-  char buf[BUF_SIZE];
-  int len = sprintf(buf, "size\n%d %d\n", ws.ws_col, ws.ws_row-2);
-  write(controlFifo_c, buf, len);
+  setSize();
 
   write(controlFifo_c, "show\n", 5);
 
