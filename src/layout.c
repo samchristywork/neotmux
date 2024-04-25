@@ -35,7 +35,7 @@ void evenHorizontalLayout(Pane *panes, int nPanes, int height, int width) {
   for (int i = 0; i < nPanes; i++) {
     panes[i].row = 0;
     panes[i].col = col;
-    panes[i].height = height - 1;
+    panes[i].height = height;
     panes[i].width = remaining / (nPanes - i);
 
     vterm_set_size(panes[i].vt, panes[i].height, panes[i].width);

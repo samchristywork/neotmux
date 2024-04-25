@@ -128,7 +128,7 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
 
   bbWrite("\033[H", 3); // Move cursor to top left
 
-  infoBar(rows, cols);
+  //infoBar(rows, cols);
 
   if (barPos == TOP) {
     statusBar(cols);
@@ -138,7 +138,7 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
   vterm_state_get_cursorpos(vterm_obtain_state(panes[activeTerm].vt),
                             &cursorPos);
 
-  for (int row = 0; row < rows - 1; row++) {
+  for (int row = 0; row < rows; row++) {
     for (int col = 0; col < cols; col++) {
       if (cursorPos.row == row - panes[activeTerm].row &&
           cursorPos.col == col - panes[activeTerm].col) {
@@ -172,7 +172,9 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
         bbWrite("\033[0m", 4);
       }
     }
-    bbWrite("\r\n", 2);
+    if (row < rows - 1) {
+      bbWrite("\r\n", 2);
+    }
   }
 
   if (barPos == BOTTOM) {
