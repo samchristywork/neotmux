@@ -153,22 +153,22 @@ pid_t ptyFork(int *parentFd, char *childName, size_t len,
   return 0;
 }
 
-void addWindow(Window **windows, int *nWindows) {
-  *windows = realloc(*windows, (*nWindows + 1) * sizeof(Window));
-  if (*windows == NULL) {
+void addPane(Pane **panes, int *nPanes) {
+  *panes = realloc(*panes, (*nPanes + 1) * sizeof(Pane));
+  if (*panes == NULL) {
     exit(EXIT_FAILURE);
   }
 
-  (*windows)[*nWindows].process = -1;
-  (*windows)[*nWindows].width = 80;
-  (*windows)[*nWindows].height = 24;
-  (*windows)[*nWindows].col = 0;
-  (*windows)[*nWindows].row = 0;
-  (*windows)[*nWindows].vt = NULL;
-  (*windows)[*nWindows].vts = NULL;
-  (*windows)[*nWindows].closed = false;
+  (*panes)[*nPanes].process = -1;
+  (*panes)[*nPanes].width = 80;
+  (*panes)[*nPanes].height = 24;
+  (*panes)[*nPanes].col = 0;
+  (*panes)[*nPanes].row = 0;
+  (*panes)[*nPanes].vt = NULL;
+  (*panes)[*nPanes].vts = NULL;
+  (*panes)[*nPanes].closed = false;
 
-  (*nWindows)++;
+  (*nPanes)++;
 
   struct winsize ws;
   ws.ws_col = 80;
@@ -178,7 +178,7 @@ void addWindow(Window **windows, int *nWindows) {
 
   char childName[MAX_NAME];
   pid_t childPid =
-      ptyFork(&(*windows)[*nWindows - 1].process, childName, MAX_NAME, &ws);
+      ptyFork(&(*panes)[*nPanes - 1].process, childName, MAX_NAME, &ws);
   if (childPid == -1) {
     exit(EXIT_FAILURE);
   }
@@ -189,11 +189,11 @@ void addWindow(Window **windows, int *nWindows) {
     exit(EXIT_FAILURE);
   }
 
-  initScreen(&(*windows)[*nWindows - 1].vt, &(*windows)[*nWindows - 1].vts,
-             (*windows)[*nWindows - 1].height, (*windows)[*nWindows - 1].width);
+  initScreen(&(*panes)[*nPanes - 1].vt, &(*panes)[*nPanes - 1].vts,
+             (*panes)[*nPanes - 1].height, (*panes)[*nPanes - 1].width);
 
-  if (max_fifo < (*windows)[*nWindows - 1].process) {
-    max_fifo = (*windows)[*nWindows - 1].process;
+  if (max_fifo < (*panes)[*nPanes - 1].process) {
+    max_fifo = (*panes)[*nPanes - 1].process;
   }
 }
 
@@ -202,8 +202,8 @@ void server() {
   ws.ws_col = 80;
   ws.ws_row = 24;
 
-  Window *windows = malloc(1);
-  int nWindows = 0;
+  Pane *panes = malloc(1);
+  int nPanes = 0;
 
   if (atexit(cleanup_server) != 0) {
     exit(EXIT_FAILURE);
@@ -252,10 +252,10 @@ void server() {
 
   bool dirty = true;
 
-  addWindow(&windows, &nWindows);
-  addWindow(&windows, &nWindows);
+  addPane(&panes, &nPanes);
+  addPane(&panes, &nPanes);
 
-  calculateLayout(windows, nWindows, ws.ws_row, ws.ws_col);
+  calculateLayout(panes, nPanes, ws.ws_row, ws.ws_col);
 
   while (true) {
     fd_set inFds;
@@ -264,8 +264,8 @@ void server() {
     // Monitor inFifo_s, controlFifo_s and all ptys
     FD_SET(inFifo_s, &inFds);
     FD_SET(controlFifo_s, &inFds);
-    for (int k = 0; k < nWindows; k++) {
-      FD_SET(windows[k].process, &inFds);
+    for (int k = 0; k < nPanes; k++) {
+      FD_SET(panes[k].process, &inFds);
     }
 
     if (select(max_fifo + 1, &inFds, NULL, NULL, &tv) == -1) {
@@ -287,7 +287,7 @@ void server() {
 
       printf(">\n");
 
-      if (write(windows[activeTerm].process, buf, numRead) != numRead) {
+      if (write(panes[activeTerm].process, buf, numRead) != numRead) {
         exit(EXIT_FAILURE);
       }
 
@@ -326,39 +326,39 @@ void server() {
           i++;
         }
 
-        // vterm_set_size(windows[activeTerm].vt, newHeight, newWidth);
+        // vterm_set_size(panes[activeTerm].vt, newHeight, newWidth);
 
-        // windows[activeTerm].height = newHeight;
-        // windows[activeTerm].width = newWidth;
+        // panes[activeTerm].height = newHeight;
+        // panes[activeTerm].width = newWidth;
 
         ws.ws_row = newHeight;
         ws.ws_col = newWidth;
 
-        calculateLayout(windows, nWindows, ws.ws_row, ws.ws_col);
+        calculateLayout(panes, nPanes, ws.ws_row, ws.ws_col);
 
         dirty = true;
 
         printf("Size set to %d %d\n", newHeight, newWidth);
       } else if (numRead == 7 && strncmp(buf, "create\n", 7) == 0) {
         printf("Create control sequence\n");
-        addWindow(&windows, &nWindows);
-        calculateLayout(windows, nWindows, ws.ws_row, ws.ws_col);
+        addPane(&panes, &nPanes);
+        calculateLayout(panes, nPanes, ws.ws_row, ws.ws_col);
         dirty = true;
       } else if (numRead == 6 && strncmp(buf, "right\n", 6) == 0) {
         activeTerm++;
-        if (activeTerm == nWindows) {
+        if (activeTerm == nPanes) {
           activeTerm = 0;
         }
         dirty = true;
       } else if (numRead == 5 && strncmp(buf, "left\n", 5) == 0) {
         activeTerm--;
         if (activeTerm == -1) {
-          activeTerm = nWindows - 1;
+          activeTerm = nPanes - 1;
         }
         dirty = true;
       } else if (numRead == 5 && strncmp(buf, "show\n", 5) == 0) {
         printf("Show control sequence\n");
-        renderScreen(outFifo_s, windows, nWindows, activeTerm, ws.ws_row,
+        renderScreen(outFifo_s, panes, nPanes, activeTerm, ws.ws_row,
                      ws.ws_col);
         printf("Screen rendered\n");
       } else {
@@ -367,34 +367,34 @@ void server() {
     }
 
     // Send output from ptys to vterm
-    for (int k = 0; k < nWindows; k++) {
-      if (windows[k].closed) {
+    for (int k = 0; k < nPanes; k++) {
+      if (panes[k].closed) {
         continue;
       }
 
-      if (FD_ISSET(windows[k].process, &inFds)) {
+      if (FD_ISSET(panes[k].process, &inFds)) {
         printf("Reading from pty %d\n", k);
 
-        ssize_t numRead = read(windows[k].process, buf, BUF_SIZE);
+        ssize_t numRead = read(panes[k].process, buf, BUF_SIZE);
         if (numRead <= 0) {
           printf("Pty %d closed\n", k);
-          windows[k].closed = true;
+          panes[k].closed = true;
 
           printf("Trying to find a new active term\n");
-          for (int activeTerm = 0; activeTerm < nWindows; activeTerm++) {
-            if (!windows[activeTerm].closed) {
+          for (int activeTerm = 0; activeTerm < nPanes; activeTerm++) {
+            if (!panes[activeTerm].closed) {
               break;
             }
           }
           activeTerm++;
           printf("New active term: %d\n", activeTerm);
-          if (activeTerm == nWindows) {
-            renderScreen(outFifo_s, windows, nWindows, 0, ws.ws_row, ws.ws_col);
+          if (activeTerm == nPanes) {
+            renderScreen(outFifo_s, panes, nPanes, 0, ws.ws_row, ws.ws_col);
             exit(EXIT_SUCCESS);
           }
         } else {
           printf("%zu bytes read\n", numRead);
-          vterm_input_write(windows[k].vt, buf, numRead);
+          vterm_input_write(panes[k].vt, buf, numRead);
         }
 
         dirty = true;
@@ -403,8 +403,7 @@ void server() {
 
     if (dirty && timeDiffMs(&lastTime) > 1000 / 60) {
       printf("Rendering screen\n");
-      renderScreen(outFifo_s, windows, nWindows, activeTerm, ws.ws_row,
-                   ws.ws_col);
+      renderScreen(outFifo_s, panes, nPanes, activeTerm, ws.ws_row, ws.ws_col);
       dirty = false;
       gettimeofday(&lastTime, NULL);
     }

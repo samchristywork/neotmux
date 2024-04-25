@@ -98,14 +98,14 @@ void statusBar(int cols) {
   char buf[cols];
 
   char sessionName[] = "0";
-  int windowIndex = 0;
-  char windowName[] = "bash";
+  int paneIndex = 0;
+  char paneName[] = "bash";
 
   int n = snprintf(buf, cols, "[%s] ", sessionName);
   bbWrite(buf, n);
   idx += n;
 
-  n = snprintf(buf, cols, "%d:%s*", windowIndex, windowName);
+  n = snprintf(buf, cols, "%d:%s*", paneIndex, paneName);
   bbWrite(buf, n);
   idx += n;
 
@@ -122,8 +122,8 @@ void statusBar(int cols) {
   bbWrite("\r\n", 2);
 }
 
-void renderScreen(int fd, Window *windows, int nWindows, int activeTerm,
-                  int rows, int cols) {
+void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
+                  int cols) {
   bb.n = 0;
 
   bbWrite("\033[H", 3); // Move cursor to top left
@@ -135,27 +135,27 @@ void renderScreen(int fd, Window *windows, int nWindows, int activeTerm,
   }
 
   VTermPos cursorPos;
-  vterm_state_get_cursorpos(vterm_obtain_state(windows[activeTerm].vt),
+  vterm_state_get_cursorpos(vterm_obtain_state(panes[activeTerm].vt),
                             &cursorPos);
 
   for (int row = 0; row < rows - 1; row++) {
     for (int col = 0; col < cols; col++) {
-      if (cursorPos.row == row - windows[activeTerm].row &&
-          cursorPos.col == col - windows[activeTerm].col) {
+      if (cursorPos.row == row - panes[activeTerm].row &&
+          cursorPos.col == col - panes[activeTerm].col) {
         bbWrite("\033[7m", 4); // Invert colors
       }
       bool isRendered = false;
-      for (int k = 0; k < nWindows; k++) {
-        if (windows[k].closed) {
+      for (int k = 0; k < nPanes; k++) {
+        if (panes[k].closed) {
           continue;
         }
 
-        if (isInRect(row, col, windows[k].row, windows[k].col,
-                     windows[k].height, windows[k].width)) {
+        if (isInRect(row, col, panes[k].row, panes[k].col, panes[k].height,
+                     panes[k].width)) {
           VTermPos pos;
-          pos.row = row - windows[k].row;
-          pos.col = col - windows[k].col;
-          VTermScreen *vts = windows[k].vts;
+          pos.row = row - panes[k].row;
+          pos.col = col - panes[k].col;
+          VTermScreen *vts = panes[k].vts;
 
           VTermScreenCell cell = {0};
           vterm_screen_get_cell(vts, pos, &cell);
@@ -167,8 +167,8 @@ void renderScreen(int fd, Window *windows, int nWindows, int activeTerm,
       if (!isRendered) {
         bbWrite("?", 1);
       }
-      if (cursorPos.row == row - windows[activeTerm].row &&
-          cursorPos.col == col - windows[activeTerm].col) {
+      if (cursorPos.row == row - panes[activeTerm].row &&
+          cursorPos.col == col - panes[activeTerm].col) {
         bbWrite("\033[0m", 4);
       }
     }

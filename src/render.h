@@ -3,7 +3,7 @@
 
 #include <vterm.h>
 
-typedef struct Window {
+typedef struct Pane {
   int process;
   VTerm *vt;
   VTermScreen *vts;
@@ -12,9 +12,9 @@ typedef struct Window {
   int col;
   int row;
   bool closed;
-} Window;
+} Pane;
 
-void renderScreen(int fifo, Window *windows, int nWindows, int activeTerm,
-                  int rows, int cols);
+void renderScreen(int fifo, Pane *panes, int nPanes, int activeTerm, int rows,
+                  int cols);
 
 #endif
