@@ -338,6 +338,18 @@ void server() {
         addWindow(&windows, &nWindows);
         calculateLayout(windows, nWindows, ws.ws_row, ws.ws_col);
         dirty = true;
+      } else if (numRead == 6 && strncmp(buf, "right\n", 6) == 0) {
+        activeTerm++;
+        if (activeTerm == nWindows) {
+          activeTerm = 0;
+        }
+        dirty = true;
+      } else if (numRead == 5 && strncmp(buf, "left\n", 5) == 0) {
+        activeTerm--;
+        if (activeTerm == -1) {
+          activeTerm = nWindows - 1;
+        }
+        dirty = true;
       } else if (numRead == 5 && strncmp(buf, "show\n", 5) == 0) {
         printf("Show control sequence\n");
         renderScreen(outFifo_s, windows, nWindows, activeTerm, ws.ws_row,
