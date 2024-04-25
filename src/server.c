@@ -16,6 +16,7 @@
 int inFifo_s;
 int outFifo_s;
 int controlFifo_s;
+int max_fifo = 0;
 
 int timeDiffMs(struct timeval *lastTime) {
   struct timeval currentTime;
@@ -190,6 +191,10 @@ void addWindow(Window **windows, int *nWindows) {
 
   initScreen(&(*windows)[*nWindows - 1].vt, &(*windows)[*nWindows - 1].vts,
              (*windows)[*nWindows - 1].height, (*windows)[*nWindows - 1].width);
+
+  if (max_fifo < (*windows)[*nWindows - 1].process) {
+    max_fifo = (*windows)[*nWindows - 1].process;
+  }
 }
 
 void server() {
@@ -198,12 +203,7 @@ void server() {
   ws.ws_row = 24;
 
   Window *windows = malloc(1);
-
   int nWindows = 0;
-  addWindow(&windows, &nWindows);
-  addWindow(&windows, &nWindows);
-
-  calculateLayout(windows, nWindows, ws.ws_row, ws.ws_col);
 
   if (atexit(cleanup_server) != 0) {
     exit(EXIT_FAILURE);
@@ -237,6 +237,7 @@ void server() {
   if (controlFifo_s == -1) {
     exit(EXIT_FAILURE);
   }
+  max_fifo = controlFifo_s;
 
   printf("%d %d %d\n", inFifo_s, outFifo_s, controlFifo_s);
 
@@ -251,6 +252,11 @@ void server() {
 
   bool dirty = true;
 
+  addWindow(&windows, &nWindows);
+  addWindow(&windows, &nWindows);
+
+  calculateLayout(windows, nWindows, ws.ws_row, ws.ws_col);
+
   while (true) {
     fd_set inFds;
     FD_ZERO(&inFds);
@@ -262,7 +268,7 @@ void server() {
       FD_SET(windows[k].process, &inFds);
     }
 
-    if (select(controlFifo_s + 1, &inFds, NULL, NULL, &tv) == -1) {
+    if (select(max_fifo + 1, &inFds, NULL, NULL, &tv) == -1) {
       exit(EXIT_FAILURE);
     }
 
