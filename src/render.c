@@ -36,7 +36,8 @@ void renderCell(VTermScreenCell cell) {
     bbWrite("\033[1m", 4);
   }
 
-  if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
+  if (cell.bg.type == VTERM_COLOR_DEFAULT_BG) {
+  } else if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
     char buf[BUF_SIZE];
     int n = snprintf(buf, BUF_SIZE, "\033[48;5;%dm", cell.bg.indexed.idx);
     bbWrite(buf, n);
@@ -128,7 +129,7 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
 
   bbWrite("\033[H", 3); // Move cursor to top left
 
-  //infoBar(rows, cols);
+  // infoBar(rows, cols);
 
   if (barPos == TOP) {
     statusBar(cols);
