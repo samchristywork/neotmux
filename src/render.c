@@ -166,7 +166,8 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
         }
       }
       if (!isRendered) {
-        bbWrite("?", 1);
+        char *s = "│";
+        bbWrite(s, strlen(s));
       }
       if (cursorPos.row == row - panes[activeTerm].row &&
           cursorPos.col == col - panes[activeTerm].col) {
