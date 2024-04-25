@@ -149,10 +149,13 @@ void client() {
         mode = MODE_CONTROL;
       } else if (mode == MODE_CONTROL && buf[0] == 'h') {
         write(controlFifo_c, "left\n", 5);
+        mode = MODE_NORMAL;
       } else if (mode == MODE_CONTROL && buf[0] == 'l') {
         write(controlFifo_c, "right\n", 6);
+        mode = MODE_NORMAL;
       } else if (mode == MODE_CONTROL && buf[0] == 'c') {
         write(controlFifo_c, "create\n", 7);
+        mode = MODE_NORMAL;
       } else if (mode == MODE_CONTROL && buf[0] == 'q') {
         exit(EXIT_SUCCESS);
       } else if (mode == MODE_CONTROL) {
