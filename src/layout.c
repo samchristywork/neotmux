@@ -25,12 +25,13 @@ void evenVerticalLayout(Window *windows, int nWindows, int height, int width) {
   }
 }
 
-void evenHorizontalLayout(Window *windows, int nWindows, int height, int width) {
+void evenHorizontalLayout(Window *windows, int nWindows, int height,
+                          int width) {
   int col = 0;
   for (int i = 0; i < nWindows; i++) {
     windows[i].row = 0;
     windows[i].col = col;
-    windows[i].height = height-1;
+    windows[i].height = height - 1;
     windows[i].width = width / nWindows - 1;
 
     vterm_set_size(windows[i].vt, windows[i].height, windows[i].width);
@@ -50,6 +51,6 @@ void evenHorizontalLayout(Window *windows, int nWindows, int height, int width) 
 }
 
 void calculateLayout(Window *windows, int nWindows, int height, int width) {
-  //evenVerticalLayout(windows, nWindows, height, width);
+  // evenVerticalLayout(windows, nWindows, height, width);
   evenHorizontalLayout(windows, nWindows, height, width);
 }

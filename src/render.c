@@ -23,9 +23,7 @@ void bbWrite(const void *buf, size_t count) {
   bb.n += count;
 }
 
-void bbClear() {
-  bb.n = 0;
-}
+void bbClear() { bb.n = 0; }
 
 bool isInRect(int row, int col, int rowRect, int colRect, int height,
               int width) {
@@ -63,7 +61,7 @@ void renderCell(VTermScreenCell cell) {
   if (cell.chars[0] == 0) {
     bbWrite(" ", 1);
   } else {
-    for(int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i]; i++) {
+    for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i]; i++) {
       char bytes[6];
       int len = fill_utf8(cell.chars[i], bytes);
       bytes[len] = 0;

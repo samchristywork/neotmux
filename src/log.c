@@ -17,4 +17,5 @@ void logMessage(char *msg) {
   struct tm *tm = localtime(&t);
   strftime(currentTime, sizeof(currentTime), "%c", tm);
   fprintf(f, "%s: %s\n", currentTime, msg);
+  // fclose(f);
 }

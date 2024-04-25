@@ -125,9 +125,9 @@ pid_t ptyFork(int *parentFd, char *childName, size_t len,
       exit(EXIT_FAILURE);
     }
 
-    //if (tcsetattr(fd, TCSANOW, &oldTermios) == -1) {
-    //  exit(EXIT_FAILURE);
-    //}
+    // if (tcsetattr(fd, TCSANOW, &oldTermios) == -1) {
+    //   exit(EXIT_FAILURE);
+    // }
 
     if (ioctl(fd, TIOCSWINSZ, ws) == -1) {
       exit(EXIT_FAILURE);
@@ -326,10 +326,10 @@ void server() {
           i++;
         }
 
-        //vterm_set_size(windows[activeTerm].vt, newHeight, newWidth);
+        // vterm_set_size(windows[activeTerm].vt, newHeight, newWidth);
 
-        //windows[activeTerm].height = newHeight;
-        //windows[activeTerm].width = newWidth;
+        // windows[activeTerm].height = newHeight;
+        // windows[activeTerm].width = newWidth;
 
         ws.ws_row = newHeight;
         ws.ws_col = newWidth;
@@ -389,8 +389,7 @@ void server() {
           activeTerm++;
           printf("New active term: %d\n", activeTerm);
           if (activeTerm == nWindows) {
-            renderScreen(outFifo_s, windows, nWindows, 0, ws.ws_row,
-                         ws.ws_col);
+            renderScreen(outFifo_s, windows, nWindows, 0, ws.ws_row, ws.ws_col);
             exit(EXIT_SUCCESS);
           }
         } else {

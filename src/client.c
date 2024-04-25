@@ -103,7 +103,7 @@ void setSize() {
   }
 
   char buf[BUF_SIZE];
-  int len = sprintf(buf, "size\n%d %d\n", ws.ws_col, ws.ws_row-2);
+  int len = sprintf(buf, "size\n%d %d\n", ws.ws_col, ws.ws_row - 2);
   write(controlFifo_c, buf, len);
 }
 
