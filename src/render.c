@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <util.h>
+#include <vterm.h>
 
 // TODO: Determine the correct buffer size
 #define BUF_SIZE 100000
@@ -31,32 +32,64 @@ bool isInRect(int row, int col, int rowRect, int colRect, int height,
          col < colRect + width;
 }
 
+bool compareColors(VTermColor a, VTermColor b) {
+  if (a.type != b.type) {
+    return false;
+  }
+
+  if (a.type == VTERM_COLOR_DEFAULT_FG || a.type == VTERM_COLOR_DEFAULT_BG) {
+    return true;
+  }
+
+  if (VTERM_COLOR_IS_INDEXED(&a) && VTERM_COLOR_IS_INDEXED(&b)) {
+    return a.indexed.idx == b.indexed.idx;
+  }
+
+  if (VTERM_COLOR_IS_RGB(&a) && VTERM_COLOR_IS_RGB(&b)) {
+    return a.rgb.red == b.rgb.red && a.rgb.green == b.rgb.green &&
+           a.rgb.blue == b.rgb.blue;
+  }
+
+  return false;
+}
+
+int bold = 0;
+VTermColor bg = {0};
+VTermColor fg = {0};
+
 void renderCell(VTermScreenCell cell) {
-  if (cell.attrs.bold) {
+  if (cell.attrs.bold != bold) {
     bbWrite("\033[1m", 4);
+    bold = cell.attrs.bold;
   }
 
-  if (cell.bg.type == VTERM_COLOR_DEFAULT_BG) {
-  } else if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
-    char buf[BUF_SIZE];
-    int n = snprintf(buf, BUF_SIZE, "\033[48;5;%dm", cell.bg.indexed.idx);
-    bbWrite(buf, n);
-  } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
-    char buf[BUF_SIZE];
-    int n = snprintf(buf, BUF_SIZE, "\033[48;2;%d;%d;%dm", cell.bg.rgb.red,
-                     cell.bg.rgb.green, cell.bg.rgb.blue);
-    bbWrite(buf, n);
+  if (!compareColors(cell.bg, bg)) {
+    if (cell.bg.type == VTERM_COLOR_DEFAULT_BG) {
+    } else if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
+      char buf[BUF_SIZE];
+      int n = snprintf(buf, BUF_SIZE, "\033[48;5;%dm", cell.bg.indexed.idx);
+      bbWrite(buf, n);
+    } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
+      char buf[BUF_SIZE];
+      int n = snprintf(buf, BUF_SIZE, "\033[48;2;%d;%d;%dm", cell.bg.rgb.red,
+                       cell.bg.rgb.green, cell.bg.rgb.blue);
+      bbWrite(buf, n);
+    }
+    bg = cell.bg;
   }
 
-  if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
-    char buf[BUF_SIZE];
-    int n = snprintf(buf, BUF_SIZE, "\033[38;5;%dm", cell.fg.indexed.idx);
-    bbWrite(buf, n);
-  } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
-    char buf[BUF_SIZE];
-    int n = snprintf(buf, BUF_SIZE, "\033[38;2;%d;%d;%dm", cell.fg.rgb.red,
-                     cell.fg.rgb.green, cell.fg.rgb.blue);
-    bbWrite(buf, n);
+  if (!compareColors(cell.fg, fg)) {
+    if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
+      char buf[BUF_SIZE];
+      int n = snprintf(buf, BUF_SIZE, "\033[38;5;%dm", cell.fg.indexed.idx);
+      bbWrite(buf, n);
+    } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
+      char buf[BUF_SIZE];
+      int n = snprintf(buf, BUF_SIZE, "\033[38;2;%d;%d;%dm", cell.fg.rgb.red,
+                       cell.fg.rgb.green, cell.fg.rgb.blue);
+      bbWrite(buf, n);
+    }
+    fg = cell.fg;
   }
 
   if (cell.chars[0] == 0) {
@@ -69,11 +102,10 @@ void renderCell(VTermScreenCell cell) {
       bbWrite(bytes, len);
     }
   }
-
-  bbWrite("\033[0m", 4); // Reset colors
 }
 
 void infoBar(int rows, int cols) {
+  bbWrite("\033[0m", 4); // Reset colors
   bbWrite("\033[7m", 4); // Invert colors
   char buf[BUF_SIZE];
   static int frame = 0;
@@ -166,6 +198,10 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
         }
       }
       if (!isRendered) {
+        bzero(&bg, sizeof(bg));
+        bzero(&fg, sizeof(fg));
+        bold = 0;
+        bbWrite("\033[0m", 4);
         char *s = "│";
         bbWrite(s, strlen(s));
       }
