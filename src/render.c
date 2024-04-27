@@ -10,7 +10,7 @@
 
 enum BarPosition { TOP, BOTTOM };
 
-int barPos = TOP;
+int barPos = BOTTOM;
 
 typedef struct BackBuffer {
   char buffer[BUF_SIZE];
@@ -152,7 +152,75 @@ void statusBar(int cols) {
   bbWrite(statusRight, strlen(statusRight));
 
   bbWrite("\033[0m", 4);
-  bbWrite("\r\n", 2);
+}
+
+bool isInWindow(int row, int col, Pane *pane, int nPanes) {
+  for (int i = 0; i < nPanes; i++) {
+    if (isInRect(row, col, pane[i].row, pane[i].col, pane[i].height,
+                 pane[i].width)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void writeBorderCharacter(int row, int col, Pane *panes, int nPanes) {
+
+  bool r = isInWindow(row + 1, col, panes, nPanes) ||
+           isInWindow(row - 1, col, panes, nPanes) ||
+           (isInWindow(row + 1, col + 1, panes, nPanes) &&
+            !isInWindow(row, col + 1, panes, nPanes)) ||
+           (isInWindow(row - 1, col + 1, panes, nPanes) &&
+            !isInWindow(row, col + 1, panes, nPanes));
+
+  bool l = isInWindow(row + 1, col, panes, nPanes) ||
+           isInWindow(row - 1, col, panes, nPanes) ||
+           (isInWindow(row + 1, col - 1, panes, nPanes) &&
+            !isInWindow(row, col - 1, panes, nPanes)) ||
+           (isInWindow(row - 1, col - 1, panes, nPanes) &&
+            !isInWindow(row, col - 1, panes, nPanes));
+
+  bool d = isInWindow(row, col + 1, panes, nPanes) ||
+           isInWindow(row, col - 1, panes, nPanes) ||
+           (isInWindow(row + 1, col + 1, panes, nPanes) &&
+            !isInWindow(row + 1, col, panes, nPanes)) ||
+           (isInWindow(row + 1, col - 1, panes, nPanes) &&
+            !isInWindow(row + 1, col, panes, nPanes));
+
+  bool u = isInWindow(row, col + 1, panes, nPanes) ||
+           isInWindow(row, col - 1, panes, nPanes) ||
+           (isInWindow(row - 1, col + 1, panes, nPanes) &&
+            !isInWindow(row - 1, col, panes, nPanes)) ||
+           (isInWindow(row - 1, col - 1, panes, nPanes) &&
+            !isInWindow(row - 1, col, panes, nPanes));
+
+  if (false) {
+  } else if (u && d && l && r) {
+    bbWrite("┼", 3);
+  } else if (u && d && l && !r) {
+    bbWrite("┤", 3);
+  } else if (u && d && !l && r) {
+    bbWrite("├", 3);
+  } else if (u && d && !l && !r) {
+    bbWrite("│", 3);
+  } else if (u && !d && l && r) {
+    bbWrite("┴", 3);
+  } else if (u && !d && l && !r) {
+    bbWrite("┘", 3);
+  } else if (u && !d && !l && r) {
+    bbWrite("└", 3);
+  } else if (!u && d && l && r) {
+    bbWrite("┬", 3);
+  } else if (!u && d && l && !r) {
+    bbWrite("┐", 3);
+  } else if (!u && d && !l && r) {
+    bbWrite("┌", 3);
+  } else if (!u && !d && l && r) {
+    bbWrite("─", 3);
+  } else {
+    bbWrite(" ", 1);
+  }
 }
 
 void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
