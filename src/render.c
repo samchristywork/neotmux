@@ -234,6 +234,8 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
                   int cols) {
   bb.n = 0;
 
+  bbWrite("r", 1);
+
   bbWrite("\033[H", 3); // Move cursor to top left
 
   // infoBar(rows, cols);

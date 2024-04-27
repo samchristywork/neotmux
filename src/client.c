@@ -59,7 +59,6 @@ static void cleanup_client() {
 }
 
 void renderClient(int outFifo_c) {
-
   static char buf[BUF_SIZE];
   ssize_t numRead = read(outFifo_c, buf, BUF_SIZE);
   if (numRead <= 0) {
@@ -96,7 +95,6 @@ void setupFifos() {
 }
 
 void setSize() {
-
   struct winsize ws;
   if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) < 0) {
     exit(EXIT_FAILURE);
@@ -105,6 +103,15 @@ void setSize() {
   char buf[BUF_SIZE];
   int len = sprintf(buf, "size\n%d %d\n", ws.ws_col, ws.ws_row - 1);
   write(controlFifo_c, buf, len);
+}
+
+char readOneChar(int fd) {
+  char c;
+  if (read(fd, &c, 1) != 1) {
+    exit(EXIT_FAILURE);
+  }
+
+  return c;
 }
 
 void client() {
@@ -169,7 +176,13 @@ void client() {
 
     // Render output from outFifo_c
     if (FD_ISSET(outFifo_c, &inFds)) {
-      renderClient(outFifo_c);
+      char c = readOneChar(outFifo_c);
+      switch (c) {
+      case 'r':
+        logMessage("R");
+        renderClient(outFifo_c);
+        break;
+      }
     }
   }
 }
