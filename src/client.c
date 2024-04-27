@@ -182,6 +182,10 @@ void client() {
         logMessage("R");
         renderClient(outFifo_c);
         break;
+      case 'e':
+        logMessage("E");
+        exit(EXIT_SUCCESS);
+        break;
       }
     }
   }

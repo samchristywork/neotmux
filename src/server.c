@@ -27,6 +27,8 @@ int timeDiffMs(struct timeval *lastTime) {
 }
 
 static void cleanup_server() {
+  write(outFifo_s, "e", 1);
+  sync();
   close(inFifo_s);
   close(outFifo_s);
   close(controlFifo_s);
@@ -254,6 +256,7 @@ void server() {
 
   addPane(&panes, &nPanes);
   addPane(&panes, &nPanes);
+  addPane(&panes, &nPanes);
 
   calculateLayout(panes, nPanes, ws.ws_row, ws.ws_col);
 
@@ -389,7 +392,7 @@ void server() {
           activeTerm++;
           printf("New active term: %d\n", activeTerm);
           if (activeTerm == nPanes) {
-            renderScreen(outFifo_s, panes, nPanes, 0, ws.ws_row, ws.ws_col);
+            write(outFifo_s, "e", 1);
             exit(EXIT_SUCCESS);
           }
         } else {
