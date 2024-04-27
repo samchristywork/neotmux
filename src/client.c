@@ -55,6 +55,12 @@ void cleanup_client() {
   printf("Client stopped\n");
 }
 
+void die(const char *msg) {
+  cleanup_client();
+  printf("%s\n", msg);
+  exit(EXIT_FAILURE);
+}
+
 void renderClient(int outFifo_c) {
   static char buf[BUF_SIZE];
   ssize_t numRead = read(outFifo_c, buf, BUF_SIZE);
@@ -125,10 +131,6 @@ void client() {
 
   ttySetRaw();
 
-  if (atexit(cleanup_client) != 0) {
-    exit(EXIT_FAILURE);
-  }
-
   write(STDOUT_FILENO, "\033[?1049h", 8); // Alternate screen
   write(STDOUT_FILENO, "\033[?25l", 6);   // Hide cursor
 
@@ -146,7 +148,7 @@ void client() {
     FD_SET(outFifo_c, &inFds);
 
     if (select(outFifo_c + 1, &inFds, NULL, NULL, NULL) == -1) {
-      exit(EXIT_FAILURE);
+      //die("Select");
     }
 
     // Send input from stdin to inFifo_c
@@ -169,12 +171,12 @@ void client() {
         write(controlFifo_c, "create\n", 7);
         mode = MODE_NORMAL;
       } else if (mode == MODE_CONTROL && buf[0] == 'q') {
-        exit(EXIT_SUCCESS);
+        die("Exiting");
       } else if (mode == MODE_CONTROL) {
         mode = MODE_NORMAL;
       } else {
         if (write(inFifo_c, buf, numRead) != numRead) {
-          exit(EXIT_FAILURE);
+          die("Fifo");
         }
       }
     }
@@ -189,7 +191,7 @@ void client() {
         break;
       case 'e':
         logMessage("E");
-        exit(EXIT_SUCCESS);
+        die("E");
         break;
       }
     }
