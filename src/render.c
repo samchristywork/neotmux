@@ -154,6 +154,13 @@ void statusBar(int cols) {
   bbWrite("\033[0m", 4);
 }
 
+void clearStyle() {
+  bzero(&bg, sizeof(bg));
+  bzero(&fg, sizeof(fg));
+  bold = 0;
+  bbWrite("\033[0m", 4);
+}
+
 bool isInWindow(int row, int col, Pane *pane, int nPanes) {
   for (int i = 0; i < nPanes; i++) {
     if (isInRect(row, col, pane[i].row, pane[i].col, pane[i].height,
@@ -233,6 +240,7 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
 
   if (barPos == TOP) {
     statusBar(cols);
+    bbWrite("\r\n", 2);
   }
 
   VTermPos cursorPos;
@@ -266,12 +274,8 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
         }
       }
       if (!isRendered) {
-        bzero(&bg, sizeof(bg));
-        bzero(&fg, sizeof(fg));
-        bold = 0;
-        bbWrite("\033[0m", 4);
-        char *s = "│";
-        bbWrite(s, strlen(s));
+        clearStyle();
+        writeBorderCharacter(row, col, panes, nPanes);
       }
       if (cursorPos.row == row - panes[activeTerm].row &&
           cursorPos.col == col - panes[activeTerm].col) {
@@ -279,11 +283,13 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
       }
     }
     if (row < rows - 1) {
+      clearStyle();
       bbWrite("\r\n", 2);
     }
   }
 
   if (barPos == BOTTOM) {
+    bbWrite("\r\n", 2);
     statusBar(cols);
   }
 
