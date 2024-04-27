@@ -1,5 +1,6 @@
 #include <fcntl.h>
 #include <log.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,10 +17,6 @@ int controlFifo_c;
 struct termios oldTermios;
 
 typedef enum { MODE_NORMAL, MODE_CONTROL } Mode;
-
-void makeCursorInvisible() { printf("\033[?25l"); }
-
-void makeCursorVisible() { printf("\033[?25h"); }
 
 void alternateScreen() { printf("\033[?1049h"); }
 
@@ -45,12 +42,12 @@ void ttySetRaw() {
   }
 }
 
-static void cleanup_client() {
+void cleanup_client() {
   if (tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios) == -1) {
     exit(EXIT_FAILURE);
   }
 
-  makeCursorVisible();
+  printf("\033[?25h"); // Show cursor
   normalScreen();
   close(inFifo_c);
   close(outFifo_c);
@@ -105,6 +102,13 @@ void setSize() {
   write(controlFifo_c, buf, len);
 }
 
+void sizeChangeCallback(int sig) {
+  setSize();
+  write(controlFifo_c, "show\n", 5);
+
+  signal(SIGWINCH, sizeChangeCallback);
+}
+
 char readOneChar(int fd) {
   char c;
   if (read(fd, &c, 1) != 1) {
@@ -115,6 +119,8 @@ char readOneChar(int fd) {
 }
 
 void client() {
+  signal(SIGWINCH, sizeChangeCallback);
+
   setupFifos();
 
   ttySetRaw();
@@ -127,7 +133,6 @@ void client() {
   write(STDOUT_FILENO, "\033[?25l", 6);   // Hide cursor
 
   setSize();
-
   write(controlFifo_c, "show\n", 5);
 
   int mode = MODE_NORMAL;
