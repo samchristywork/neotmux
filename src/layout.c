@@ -51,7 +51,31 @@ void evenHorizontalLayout(Pane *panes, int nPanes, int height, int width) {
   updateLayout(panes, nPanes);
 }
 
+void mainVerticalLayout(Pane *panes, int nPanes, int height, int width) {
+  if (nPanes <= 1) {
+    evenHorizontalLayout(panes, nPanes, height, width);
+    return;
+  }
+
+  panes[0].row = 0;
+  panes[0].col = 0;
+  panes[0].height = height;
+  panes[0].width = width / 2;
+
+  int remaining = height;
+  for (int i = 1; i < nPanes; i++) {
+    panes[i].row = height - remaining;
+    panes[i].col = width / 2 + 1;
+    panes[i].height = remaining / (nPanes - i);
+    panes[i].width = width / 2;
+
+    remaining -= panes[i].height;
+    remaining--;
+  }
+
+  updateLayout(panes, nPanes);
+}
+
 void calculateLayout(Pane *panes, int nPanes, int height, int width) {
-  // evenVerticalLayout(panes, nPanes, height, width);
-  evenHorizontalLayout(panes, nPanes, height, width);
+  mainVerticalLayout(panes, nPanes, height, width);
 }
