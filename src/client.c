@@ -124,6 +124,15 @@ char readOneChar(int fd) {
   return c;
 }
 
+size_t readOneSizeT(int fd) {
+  size_t s;
+  if (read(fd, &s, sizeof(size_t)) != sizeof(size_t)) {
+    exit(EXIT_FAILURE);
+  }
+
+  return s;
+}
+
 void client() {
   signal(SIGWINCH, sizeChangeCallback);
 
@@ -139,6 +148,8 @@ void client() {
 
   int mode = MODE_NORMAL;
 
+  logMessage("Client started");
+
   while (true) {
     fd_set inFds;
     FD_ZERO(&inFds);
@@ -148,7 +159,7 @@ void client() {
     FD_SET(outFifo_c, &inFds);
 
     if (select(outFifo_c + 1, &inFds, NULL, NULL, NULL) == -1) {
-      //die("Select");
+      // die("Select");
     }
 
     // Send input from stdin to inFifo_c
@@ -185,14 +196,19 @@ void client() {
     if (FD_ISSET(outFifo_c, &inFds)) {
       char c = readOneChar(outFifo_c);
       switch (c) {
-      case 'r':
-        logMessage("R");
+      case 'r': {
+        size_t b = readOneSizeT(outFifo_c);
+        char msg[100];
+        snprintf(msg, 100, "Render %ld bytes", b);
+        logMessage(msg);
         renderClient(outFifo_c);
         break;
-      case 'e':
-        logMessage("E");
+      }
+      case 'e': {
+        logMessage("Exit message received");
         die("E");
         break;
+      }
       }
     }
   }

@@ -236,6 +236,9 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
 
   bbWrite("r", 1);
 
+  size_t s = -1;
+  bbWrite(&s, sizeof(size_t));
+
   bbWrite("\033[H", 3); // Move cursor to top left
 
   // infoBar(rows, cols);
@@ -295,5 +298,6 @@ void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
     statusBar(cols);
   }
 
+  memcpy(bb.buffer + 1, &bb.n, sizeof(size_t));
   write(fd, bb.buffer, bb.n);
 }
