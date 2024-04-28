@@ -102,5 +102,5 @@ void mainHorizontalLayout(Pane *panes, int nPanes, int height, int width) {
 }
 
 void calculateLayout(Pane *panes, int nPanes, int height, int width) {
-  mainHorizontalLayout(panes, nPanes, height, width);
+  mainVerticalLayout(panes, nPanes, height, width);
 }

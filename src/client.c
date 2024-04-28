@@ -61,12 +61,17 @@ void die(const char *msg) {
   exit(EXIT_FAILURE);
 }
 
-void renderClient(int outFifo_c) {
+void renderClient(int outFifo_c, size_t size) {
+  // TODO: Ensure that we read the number of bytes the server says we should
   static char buf[BUF_SIZE];
   ssize_t numRead = read(outFifo_c, buf, BUF_SIZE);
   if (numRead <= 0) {
-    exit(EXIT_SUCCESS);
+    die("Read");
   }
+
+  char msg[100];
+  snprintf(msg, 100, "Read %ld bytes", numRead);
+  logMessage(msg);
 
   write(STDOUT_FILENO, buf, numRead);
 }
@@ -197,11 +202,11 @@ void client() {
       char c = readOneChar(outFifo_c);
       switch (c) {
       case 'r': {
-        size_t b = readOneSizeT(outFifo_c);
+        size_t screenSize = readOneSizeT(outFifo_c);
         char msg[100];
-        snprintf(msg, 100, "Render %ld bytes", b);
+        snprintf(msg, 100, "Render %ld bytes", screenSize);
         logMessage(msg);
-        renderClient(outFifo_c);
+        renderClient(outFifo_c, screenSize);
         break;
       }
       case 'e': {
