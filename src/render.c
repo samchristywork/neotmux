@@ -11,6 +11,9 @@
 enum BarPosition { TOP, BOTTOM };
 
 int barPos = BOTTOM;
+int bold = 0;
+VTermColor bg = {0};
+VTermColor fg = {0};
 
 typedef struct BackBuffer {
   char buffer[BUF_SIZE];
@@ -53,9 +56,17 @@ bool compareColors(VTermColor a, VTermColor b) {
   return false;
 }
 
-int bold = 0;
-VTermColor bg = {0};
-VTermColor fg = {0};
+void bbWriteIndexed(int idx, int type) {
+  char buf[32];
+  int n = snprintf(buf, 32, "\033[%d;5;%dm", type, idx);
+  bbWrite(buf, n);
+}
+
+void bbWriteRGB(int red, int green, int blue, int type) {
+  char buf[32];
+  int n = snprintf(buf, 32, "\033[%d;2;%d;%d;%dm", type, red, green, blue);
+  bbWrite(buf, n);
+}
 
 void renderCell(VTermScreenCell cell) {
   if (cell.attrs.bold != bold) {
@@ -66,28 +77,18 @@ void renderCell(VTermScreenCell cell) {
   if (!compareColors(cell.bg, bg)) {
     if (cell.bg.type == VTERM_COLOR_DEFAULT_BG) {
     } else if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
-      char buf[BUF_SIZE];
-      int n = snprintf(buf, BUF_SIZE, "\033[48;5;%dm", cell.bg.indexed.idx);
-      bbWrite(buf, n);
+      bbWriteIndexed(cell.bg.indexed.idx, 48);
     } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
-      char buf[BUF_SIZE];
-      int n = snprintf(buf, BUF_SIZE, "\033[48;2;%d;%d;%dm", cell.bg.rgb.red,
-                       cell.bg.rgb.green, cell.bg.rgb.blue);
-      bbWrite(buf, n);
+      bbWriteRGB(cell.bg.rgb.red, cell.bg.rgb.green, cell.bg.rgb.blue, 48);
     }
     bg = cell.bg;
   }
 
   if (!compareColors(cell.fg, fg)) {
     if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
-      char buf[BUF_SIZE];
-      int n = snprintf(buf, BUF_SIZE, "\033[38;5;%dm", cell.fg.indexed.idx);
-      bbWrite(buf, n);
+      bbWriteIndexed(cell.fg.indexed.idx, 38);
     } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
-      char buf[BUF_SIZE];
-      int n = snprintf(buf, BUF_SIZE, "\033[38;2;%d;%d;%dm", cell.fg.rgb.red,
-                       cell.fg.rgb.green, cell.fg.rgb.blue);
-      bbWrite(buf, n);
+      bbWriteRGB(cell.fg.rgb.red, cell.fg.rgb.green, cell.fg.rgb.blue, 38);
     }
     fg = cell.fg;
   }
