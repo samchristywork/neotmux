@@ -151,3 +151,118 @@ void render_cell(VTermScreenCell cell) {
     }
   }
 }
+
+void color(int color) {
+  char buf[32];
+  int n = snprintf(buf, 32, "\033[38;5;%dm", color);
+  bb_write(buf, n);
+}
+
+void status_bar(int cols) {
+  bb_write("\033[7m", 4); // Invert colors
+  color(2);
+
+  int idx = 0;
+  char buf[cols];
+
+  char sessionName[] = "0";
+  int paneIndex = 0;
+  char paneName[] = "bash";
+
+  int n = snprintf(buf, cols, "[%s] ", sessionName);
+  bb_write(buf, n);
+  idx += n;
+
+  n = snprintf(buf, cols, "%d:%s*", paneIndex, paneName);
+  bb_write(buf, n);
+  idx += n;
+
+  char *statusRight = "Hello, World!";
+  idx += strlen(statusRight);
+
+  for (int i = idx; i < cols; i++) {
+    bb_write(" ", 1);
+  }
+
+  bb_write(statusRight, strlen(statusRight));
+
+  bb_write("\033[0m", 4);
+}
+
+void clear_style() {
+  bzero(&bg, sizeof(bg));
+  bzero(&fg, sizeof(fg));
+  bold = 0;
+  bb_write("\033[0m", 4);
+}
+
+bool is_in_window(int row, int col, Window *window) {
+  int n = window->pane_count;
+
+  for (int i = 0; i < n; i++) {
+    Pane *pane = &window->panes[i];
+    if (is_in_rect(row, col, pane->row, pane->col, pane[i].height,
+                   pane[i].width)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void write_border_character(int row, int col, Window *window) {
+  bool r = is_in_window(row + 1, col, window) ||
+           is_in_window(row - 1, col, window) ||
+           (is_in_window(row + 1, col + 1, window) &&
+            !is_in_window(row, col + 1, window)) ||
+           (is_in_window(row - 1, col + 1, window) &&
+            !is_in_window(row, col + 1, window));
+
+  bool l = is_in_window(row + 1, col, window) ||
+           is_in_window(row - 1, col, window) ||
+           (is_in_window(row + 1, col - 1, window) &&
+            !is_in_window(row, col - 1, window)) ||
+           (is_in_window(row - 1, col - 1, window) &&
+            !is_in_window(row, col - 1, window));
+
+  bool d = is_in_window(row, col + 1, window) ||
+           is_in_window(row, col - 1, window) ||
+           (is_in_window(row + 1, col + 1, window) &&
+            !is_in_window(row + 1, col, window)) ||
+           (is_in_window(row + 1, col - 1, window) &&
+            !is_in_window(row + 1, col, window));
+
+  bool u = is_in_window(row, col + 1, window) ||
+           is_in_window(row, col - 1, window) ||
+           (is_in_window(row - 1, col + 1, window) &&
+            !is_in_window(row - 1, col, window)) ||
+           (is_in_window(row - 1, col - 1, window) &&
+            !is_in_window(row - 1, col, window));
+
+  if (false) {
+  } else if (u && d && l && r) {
+    bb_write("┼", 3);
+  } else if (u && d && l && !r) {
+    bb_write("┤", 3);
+  } else if (u && d && !l && r) {
+    bb_write("├", 3);
+  } else if (u && d && !l && !r) {
+    bb_write("│", 3);
+  } else if (u && !d && l && r) {
+    bb_write("┴", 3);
+  } else if (u && !d && l && !r) {
+    bb_write("┘", 3);
+  } else if (u && !d && !l && r) {
+    bb_write("└", 3);
+  } else if (!u && d && l && r) {
+    bb_write("┬", 3);
+  } else if (!u && d && l && !r) {
+    bb_write("┐", 3);
+  } else if (!u && d && !l && r) {
+    bb_write("┌", 3);
+  } else if (!u && !d && l && r) {
+    bb_write("─", 3);
+  } else {
+    bb_write(" ", 1);
+  }
+}
