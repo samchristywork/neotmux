@@ -23,6 +23,12 @@ typedef struct BackBuffer {
 } BackBuffer;
 BackBuffer bb;
 
+#define bb_write(buf, count)                                                   \
+  do {                                                                         \
+    memcpy(bb.buffer + bb.n, buf, count);                                      \
+    bb.n += count;                                                             \
+  } while (0)
+
 unsigned int utf8_seqlen(long codepoint) {
   if (codepoint < 0x0000080)
     return 1;
@@ -69,11 +75,6 @@ int fill_utf8(long codepoint, char *str) {
   }
 
   return nbytes;
-}
-
-void bb_write(const void *buf, size_t count) {
-  memcpy(bb.buffer + bb.n, buf, count);
-  bb.n += count;
 }
 
 bool is_in_rect(int row, int col, int rowRect, int colRect, int height,
