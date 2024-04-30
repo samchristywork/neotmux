@@ -41,7 +41,7 @@ typedef struct Session {
 } Session;
 
 void print_sessions(Session *sessions, int count);
-void add_pane(Window *window, int x, int y, int width, int height);
+Pane *add_pane(Window *window, int col, int row, int width, int height);
 Window *add_window(Session *session, char *title);
 
 #endif
