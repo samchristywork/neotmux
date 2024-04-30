@@ -266,3 +266,78 @@ void write_border_character(int row, int col, Window *window) {
     bb_write(" ", 1);
   }
 }
+
+void render_screen(int fd) {
+  bb.n = 0;
+
+  int cols = 80;
+  int rows = 12;
+
+  bb_write("\033[H", 3); // Move cursor to top left
+
+  if (barPos == TOP) {
+    status_bar(cols);
+    bb_write("\r\n", 2);
+  }
+
+  VTermPos cursorPos;
+  Window *currentWindow = &sessions->windows[sessions->current_window];
+  Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
+  vterm_state_get_cursorpos(vterm_obtain_state(currentPane->process.vt),
+                            &cursorPos);
+
+  for (int row = 0; row < rows; row++) {
+    for (int col = 0; col < cols; col++) {
+      if (cursorPos.row == row - currentPane->row &&
+          cursorPos.col == col - currentPane->col) {
+        bb_write("\033[7m", 4); // Invert colors
+      }
+      bool isRendered = false;
+      for (int k = 0; k < currentWindow->pane_count; k++) {
+        Pane *pane = &currentWindow->panes[k];
+        if (pane->process.closed) {
+          continue;
+        }
+
+        if (is_in_rect(row, col, pane->row, pane->col, pane->height,
+                       pane->width)) {
+          VTermPos pos;
+          pos.row = row - pane->row;
+          pos.col = col - pane->col;
+          VTermScreen *vts = pane->process.vts;
+
+          VTermScreenCell cell = {0};
+          vterm_screen_get_cell(vts, pos, &cell);
+          render_cell(cell);
+          isRendered = true;
+          break;
+        }
+      }
+      if (!isRendered) {
+        clear_style();
+        write_border_character(row, col, currentWindow);
+      }
+      if (cursorPos.row == row - currentPane->row &&
+          cursorPos.col == col - currentPane->col) {
+        bb_write("\033[0m", 4);
+      }
+    }
+    if (row < rows - 1) {
+      clear_style();
+      bb_write("\r\n", 2);
+    }
+  }
+
+  if (barPos == BOTTOM) {
+    bb_write("\r\n", 2);
+    status_bar(cols);
+  }
+
+  static int numRenders = 0;
+  char buf[100];
+  int n = snprintf(buf, 100, "\nRendered %d times", numRenders);
+  bb_write(buf, n);
+  numRenders++;
+
+  write(fd, bb.buffer, bb.n);
+}
