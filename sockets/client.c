@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,23 +10,24 @@
 #include <unistd.h>
 
 struct termios term;
+enum Mode { MODE_NORMAL, MODE_CONTROL };
+fd_set fds;
 
-int client_create_socket() {
-  int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
-  if (socket_desc == -1) {
-    printf("Could not create socket");
-    return -1;
-  }
-  return socket_desc;
+bool ctrl_c_pressed = false;
+
+void ctrl_c_callback(int sig) {
+  ctrl_c_pressed = true;
+
+  signal(sig, ctrl_c_callback);
 }
 
-void rawMode() {
+void raw_mode() {
   tcgetattr(STDIN_FILENO, &term);
   term.c_lflag &= ~(ICANON | ECHO);
   tcsetattr(STDIN_FILENO, TCSANOW, &term);
 }
 
-void resetMode() {
+void reset_mode() {
   term.c_lflag |= ICANON | ECHO;
   tcsetattr(STDIN_FILENO, TCSANOW, &term);
 }
@@ -33,7 +35,7 @@ void resetMode() {
 void configure_server(struct sockaddr_in *server) {
   server->sin_addr.s_addr = inet_addr("127.0.0.1");
   server->sin_family = AF_INET;
-  server->sin_port = htons(8889);
+  server->sin_port = htons(8888);
 }
 
 int connect_to_server(int sock, struct sockaddr_in *server) {
@@ -41,73 +43,115 @@ int connect_to_server(int sock, struct sockaddr_in *server) {
     perror("connect failed. Error");
     return 1;
   }
-
-  puts("Connected\n");
   return 0;
 }
 
-void receive_message_from_server(int sock, fd_set *fds, char *server_reply) {
-  FD_ZERO(fds);
-  FD_SET(sock, fds);
+void receive_message_from_server(int sock) {
+  FD_ZERO(&fds);
+  FD_SET(sock, &fds);
 
-  int retval = select(sock + 1, fds, NULL, NULL, NULL);
+  char server_reply[2000];
+  int retval = select(sock + 1, &fds, NULL, NULL, NULL);
   if (retval == -1) {
     perror("select()");
   } else if (retval) {
     int read_size = recv(sock, server_reply, 2000, 0);
     if (read_size == 0) {
       puts("Server disconnected");
-      fflush(stdout);
+      exit(EXIT_FAILURE);
     } else if (read_size == -1) {
       perror("recv failed");
+      exit(EXIT_FAILURE);
     }
-    puts(server_reply);
+    write(STDOUT_FILENO, server_reply, read_size);
+    fflush(stdout);
   } else {
     puts("Timeout");
   }
 }
 
-void send_message_to_server(int sock) {
-  rawMode();
+void handle_key(int numRead, char *buf, int sock, char *str, char c) {
+  if (numRead == 1 && buf[1] == c) {
+    write(sock, str, strlen(str));
+  }
+}
 
+void event_loop(int sock) {
+  raw_mode();
+
+  int mode = MODE_NORMAL;
+  char buf[32];
+  buf[0] = 'e';
   while (1) {
-    int c = getchar();
-    if (c == 3) { // Ctrl-C
-      break;
-    } else if (c == 'q') {
-      break;
+    ssize_t numRead = read(STDIN_FILENO, buf + 1, 31);
+    if (numRead <= 0) {
+      exit(EXIT_SUCCESS);
     }
-    printf("Sending: %c\n", c);
-    write(sock, &c, 1);
+
+    if (ctrl_c_pressed) {
+      printf("\n\n\nCtrl-C pressed\n\n\n");
+    }
+
+    if (mode == MODE_NORMAL) {
+      if (numRead == 1 && buf[1] == 1) { // Ctrl-A
+        mode = MODE_CONTROL;
+      } else {
+        write(sock, buf, numRead + 1);
+      }
+    } else if (mode == MODE_CONTROL) {
+      handle_key(numRead, buf, sock, "cSplit", '|');
+      handle_key(numRead, buf, sock, "cVSplit", '_');
+      handle_key(numRead, buf, sock, "cList", 'i');
+      handle_key(numRead, buf, sock, "cCreate", 'c');
+      handle_key(numRead, buf, sock, "cReload", 'r');
+      handle_key(numRead, buf, sock, "cLeft", 'h');
+      handle_key(numRead, buf, sock, "cDown", 'j');
+      handle_key(numRead, buf, sock, "cUp", 'k');
+      handle_key(numRead, buf, sock, "cRight", 'l');
+      handle_key(numRead, buf, sock, "cNext", 'n');
+      handle_key(numRead, buf, sock, "cPrev", 'p');
+
+      if (numRead == 1 && buf[1] == 'q') {
+        break;
+      }
+
+      mode = MODE_NORMAL;
+    }
   }
 
-  resetMode();
+  reset_mode();
 }
 
 int client() {
-  char message[2000], server_reply[2000];
-
-  int sock = client_create_socket();
+  signal(SIGINT, ctrl_c_callback);
 
   struct sockaddr_in server;
   configure_server(&server);
 
-  if (connect_to_server(sock, &server)) {
-    return 1;
+  int sock = socket(AF_INET, SOCK_STREAM, 0);
+  if (sock == -1) {
+    perror("Could not create socket");
+    close(sock);
+    return EXIT_FAILURE;
   }
 
-  fd_set fds;
+  if (connect_to_server(sock, &server)) {
+    close(sock);
+    return EXIT_FAILURE;
+  }
 
+  printf("\033[?1049h"); // Alternate screen
   pid_t pid = fork();
   if (pid == 0) { // Child
     while (1) {
-      receive_message_from_server(sock, &fds, server_reply);
+      receive_message_from_server(sock);
     }
   } else {
-    send_message_to_server(sock);
+    event_loop(sock);
     kill(pid, SIGKILL);
   }
 
   close(sock);
-  return 0;
+  printf("\033[?1049l"); // Normal screen
+  return EXIT_SUCCESS;
 }
