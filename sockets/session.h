@@ -4,8 +4,12 @@
 #include <vterm.h>
 
 typedef enum Layout {
-  LAYOUT_HORIZONTAL = 0,
-  LAYOUT_VERTICAL = 1,
+  LAYOUT_DEFAULT = 0,
+  LAYOUT_EVEN_HORIZONTAL,
+  LAYOUT_EVEN_VERTICAL,
+  LAYOUT_MAIN_HORIZONTAL,
+  LAYOUT_MAIN_VERTICAL,
+  LAYOUT_TILED,
 } Layout;
 
 typedef struct Process {
@@ -15,6 +19,7 @@ typedef struct Process {
   VTerm *vt;
   VTermScreen *vts;
   bool closed;
+  bool cursor_visible;
 } Process;
 
 typedef struct Pane {
@@ -30,7 +35,10 @@ typedef struct Window {
   char *title;
   int pane_count;
   int current_pane;
+  int width;
+  int height;
   Layout layout;
+  int zoom;
 } Window;
 
 typedef struct Session {

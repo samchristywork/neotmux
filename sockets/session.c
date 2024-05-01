@@ -12,12 +12,28 @@ void print_session(Session *session) {
     printf("  Window: %s\n", window->title);
     printf("    Pane Count: %d\n", window->pane_count);
     printf("    Current Pane: %d\n", window->current_pane);
-    if (window->layout == LAYOUT_HORIZONTAL) {
-      printf("    Layout: %s\n", "Horizontal");
-    } else if (window->layout == LAYOUT_VERTICAL) {
-      printf("    Layout: %s\n", "Vertical");
-    } else {
-      printf("    Layout: %s\n", "Unknown");
+    switch (window->layout) {
+      case LAYOUT_DEFAULT:
+        printf("    Layout: %s\n", "Default");
+        break;
+      case LAYOUT_EVEN_HORIZONTAL:
+        printf("    Layout: %s\n", "Even Horizontal");
+        break;
+      case LAYOUT_EVEN_VERTICAL:
+        printf("    Layout: %s\n", "Even Vertical");
+        break;
+      case LAYOUT_MAIN_HORIZONTAL:
+        printf("    Layout: %s\n", "Main Horizontal");
+        break;
+      case LAYOUT_MAIN_VERTICAL:
+        printf("    Layout: %s\n", "Main Vertical");
+        break;
+      case LAYOUT_TILED:
+        printf("    Layout: %s\n", "Tiled");
+        break;
+      default:
+        printf("    Layout: %s\n", "Unknown");
+        break;
     }
     for (int j = 0; j < window->pane_count; j++) {
       Pane *pane = &window->panes[j];
@@ -67,6 +83,10 @@ Window *add_window(Session *session, char *title) {
   window->pane_count = 0;
   window->current_pane = 0;
   window->panes = NULL;
+  window->layout = LAYOUT_MAIN_VERTICAL;
+  window->width = 80;
+  window->height = 24;
+  window->zoom = -1;
   session->window_count++;
   return window;
 }
