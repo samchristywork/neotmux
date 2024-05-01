@@ -227,14 +227,26 @@ void clear_style() {
   bb_write("\033[0m", 4);
 }
 
-bool is_in_window(int row, int col, Window *window) {
-  int n = window->pane_count;
-
-  for (int i = 0; i < n; i++) {
+bool is_border_here(int row, int col, Window *window) {
+  for (int i = 0; i < window->pane_count; i++) {
     Pane *pane = &window->panes[i];
-    if (is_in_rect(row, col, pane->row, pane->col, pane[i].height,
-                   pane[i].width)) {
-      return true;
+    if (is_in_rect(row, col, pane->row, pane->col, pane->height, pane->width)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool borders_active_pane(int row, int col, Window *window) {
+  Pane *pane = &window->panes[window->current_pane];
+
+  for (int x = -1; x <= 1; x++) {
+    for (int y = -1; y <= 1; y++) {
+      if (is_in_rect(row, col, pane->row + y, pane->col + x, pane->height,
+                     pane->width)) {
+        return true;
+      }
     }
   }
 
@@ -242,33 +254,10 @@ bool is_in_window(int row, int col, Window *window) {
 }
 
 void write_border_character(int row, int col, Window *window) {
-  bool r = is_in_window(row + 1, col, window) ||
-           is_in_window(row - 1, col, window) ||
-           (is_in_window(row + 1, col + 1, window) &&
-            !is_in_window(row, col + 1, window)) ||
-           (is_in_window(row - 1, col + 1, window) &&
-            !is_in_window(row, col + 1, window));
-
-  bool l = is_in_window(row + 1, col, window) ||
-           is_in_window(row - 1, col, window) ||
-           (is_in_window(row + 1, col - 1, window) &&
-            !is_in_window(row, col - 1, window)) ||
-           (is_in_window(row - 1, col - 1, window) &&
-            !is_in_window(row, col - 1, window));
-
-  bool d = is_in_window(row, col + 1, window) ||
-           is_in_window(row, col - 1, window) ||
-           (is_in_window(row + 1, col + 1, window) &&
-            !is_in_window(row + 1, col, window)) ||
-           (is_in_window(row + 1, col - 1, window) &&
-            !is_in_window(row + 1, col, window));
-
-  bool u = is_in_window(row, col + 1, window) ||
-           is_in_window(row, col - 1, window) ||
-           (is_in_window(row - 1, col + 1, window) &&
-            !is_in_window(row - 1, col, window)) ||
-           (is_in_window(row - 1, col - 1, window) &&
-            !is_in_window(row - 1, col, window));
+  bool r = is_border_here(row, col + 1, window);
+  bool l = is_border_here(row, col - 1, window);
+  bool d = is_border_here(row + 1, col, window);
+  bool u = is_border_here(row - 1, col, window);
 
   if (false) {
   } else if (u && d && l && r) {
