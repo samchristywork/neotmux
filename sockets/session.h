@@ -20,6 +20,8 @@ typedef struct Process {
   VTermScreen *vts;
   bool closed;
   bool cursor_visible;
+  int cursor_shape;
+  int mouse;
 } Process;
 
 typedef struct Pane {
@@ -48,8 +50,15 @@ typedef struct Session {
   int current_window;
 } Session;
 
-void print_sessions(Session *sessions, int count);
+typedef struct Neotmux {
+  Session *sessions;
+  int session_count;
+  int current_session;
+} Neotmux;
+
+void print_sessions(Neotmux *neotmux);
 Pane *add_pane(Window *window, int col, int row, int width, int height);
 Window *add_window(Session *session, char *title);
+Session *add_session(Neotmux *neotmux, char *title);
 
 #endif
