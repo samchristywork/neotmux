@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "session.h"
@@ -15,6 +16,8 @@ VTermColor bg = {0};
 VTermColor fg = {0};
 
 // TODO: Determine the correct buffer size
+// This is less inefficient than it seems because the memory is statically
+// allocated.
 #define BUF_SIZE 100000
 
 typedef struct BackBuffer {
@@ -153,40 +156,67 @@ void render_cell(VTermScreenCell cell) {
   }
 }
 
-void color(int color) {
+void bb_color(int color) {
   char buf[32];
   int n = snprintf(buf, 32, "\033[38;5;%dm", color);
   bb_write(buf, n);
 }
 
+// TODO: Handle overflow condition
 void status_bar(int cols) {
+  int width = 0;
+  Window *current_window = &sessions->windows[sessions->current_window];
+
   bb_write("\033[7m", 4); // Invert colors
-  color(2);
+  bb_color(2);
 
-  int idx = 0;
-  char buf[cols];
+  char *sessionName = sessions->title;
+  bb_write("[", 1);
+  width++;
 
-  char sessionName[] = "0";
-  int paneIndex = 0;
-  char paneName[] = "bash";
+  bb_write(sessionName, strlen(sessionName));
+  width += strlen(sessionName);
 
-  int n = snprintf(buf, cols, "[%s] ", sessionName);
-  bb_write(buf, n);
-  idx += n;
+  bb_write("]", 1);
+  width += 1;
 
-  n = snprintf(buf, cols, "%d:%s*", paneIndex, paneName);
-  bb_write(buf, n);
-  idx += n;
+  for (int i = 0; i < sessions->window_count; i++) {
+    Window *window = &sessions->windows[i];
+    bb_write("  ", 2);
+    width += 2;
 
-  char *statusRight = "Hello, World!";
-  idx += strlen(statusRight);
+    bb_write(window->title, strlen(window->title));
+    width += strlen(window->title);
 
-  for (int i = idx; i < cols; i++) {
-    bb_write(" ", 1);
+    if (window == current_window) {
+      bb_write("*", 1);
+      width++;
+    }
   }
 
-  bb_write(statusRight, strlen(statusRight));
+  char hostname[50];
+  gethostname(hostname, 50);
 
+  time_t t = time(NULL);
+  struct tm *tm = localtime(&t);
+  int hour = tm->tm_hour;
+  int minute = tm->tm_min;
+  int day = tm->tm_mday;
+  static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  const char *month = months[tm->tm_mon];
+  int year = tm->tm_year + 1900;
+
+  char statusRight[100];
+  snprintf(statusRight, 100, "\"%s\" %d:%02d %d-%s-%d", hostname, hour, minute,
+           day, month, year);
+  width += strlen(statusRight);
+
+  char padding[cols - width];
+  memset(padding, ' ', cols - width);
+
+  bb_write(padding, cols - width);
+  bb_write(statusRight, strlen(statusRight));
   bb_write("\033[0m", 4);
 }
 
