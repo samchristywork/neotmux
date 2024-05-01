@@ -116,6 +116,96 @@ int accept_connection(int socket_desc, struct sockaddr_in client) {
   return socket;
 }
 
+bool within_rect(int x, int y, int x1, int y1, int w, int h) {
+  return x >= x1 && x < x1 + w && y >= y1 && y < y1 + h;
+}
+
+int left(Window *w) {
+  Pane *currentPane = &w->panes[w->current_pane];
+  int col = currentPane->col;
+  int row = currentPane->row;
+  col--;
+
+  while (true) {
+    if (col < 0) {
+      col = w->width - 1;
+    }
+    for (int i = 0; i < w->pane_count; i++) {
+      Pane *pane = &w->panes[i];
+      if (within_rect(col, row, pane->col, pane->row, pane->width,
+                      pane->height)) {
+        return i;
+      }
+    }
+    col--;
+  }
+}
+
+int right(Window *w) {
+  Pane *currentPane = &w->panes[w->current_pane];
+  int col = currentPane->col;
+  int row = currentPane->row;
+  col += currentPane->width;
+
+  while (true) {
+    if (col >= w->width) {
+      col = 0;
+    }
+    for (int i = 0; i < w->pane_count; i++) {
+      Pane *pane = &w->panes[i];
+      if (within_rect(col, row, pane->col, pane->row, pane->width,
+                      pane->height)) {
+        return i;
+      }
+    }
+    col++;
+  }
+}
+
+int up(Window *w) {
+  Pane *currentPane = &w->panes[w->current_pane];
+  int col = currentPane->col;
+  int row = currentPane->row;
+  row--;
+
+  while (true) {
+    if (row < 0) {
+      row = w->height - 1;
+    }
+    for (int i = 0; i < w->pane_count; i++) {
+      Pane *pane = &w->panes[i];
+      if (within_rect(col, row, pane->col, pane->row, pane->width,
+                      pane->height)) {
+        return i;
+      }
+    }
+    row--;
+  }
+}
+
+int down(Window *w) {
+  Pane *currentPane = &w->panes[w->current_pane];
+  int col = currentPane->col;
+  int row = currentPane->row;
+  row += currentPane->height;
+
+  while (true) {
+    if (row >= w->height) {
+      row = 0;
+    }
+    for (int i = 0; i < w->pane_count; i++) {
+      Pane *pane = &w->panes[i];
+      if (within_rect(col, row, pane->col, pane->row, pane->width,
+                      pane->height)) {
+        return i;
+      }
+    }
+    row++;
+  }
+}
+
+// TODO: Rework this code
+// All possible inputs should have an associated message
 bool handle_input(int socket, char *buf, int read_size) {
   if (read_size == 0) {
     printf("Client disconnected (%d)\n", socket);
@@ -154,15 +244,29 @@ bool handle_input(int socket, char *buf, int read_size) {
     } else if (strcmp(commandString, "List") == 0) {
       pthread_mutex_lock(&mutex);
       print_sessions(sessions, num_sessions);
-      pthread_mutex_unlock(&mutex);
-    } else if (strcmp(commandString, "Reload") == 0) {
+    } else if (strcmp(cmd, "Left") == 0) {
+      w->current_pane = left(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Right") == 0) {
+      w->current_pane = right(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Up") == 0) {
+      w->current_pane = up(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Down") == 0) {
+      w->current_pane = down(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Reload") == 0) {
       printf("Reloading (%d)\n", socket);
       fflush(stdout);
+      pthread_mutex_unlock(&mutex);
+      close(socket);
       exit(EXIT_SUCCESS);
     } else {
-      printf("Unhandled command (%d): %s\n", socket, commandString);
+      printf("Unhandled command (%d): %s\n", socket, cmd);
       fflush(stdout);
     }
+    pthread_mutex_unlock(&mutex);
   } else {
     printf("Unhandled input (%d)\n", socket);
     fflush(stdout);
@@ -242,7 +346,8 @@ void *client_handler(void *socket_desc) {
       }
     } else if (retval == 0) { // Timeout
       if (dirty) {
-        render_screen(socket);
+        Window *w = &sessions->windows[sessions->current_window];
+        render_screen(socket, w->height, w->width);
         dirty = false;
       }
     }
