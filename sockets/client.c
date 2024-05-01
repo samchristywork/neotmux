@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -46,7 +47,7 @@ int connect_to_server(int sock, struct sockaddr_in *server) {
   return 0;
 }
 
-void receive_message_from_server(int sock) {
+void receive_message(int sock) {
   FD_ZERO(&fds);
   FD_SET(sock, &fds);
 
@@ -88,10 +89,6 @@ void event_loop(int sock) {
       exit(EXIT_SUCCESS);
     }
 
-    if (ctrl_c_pressed) {
-      printf("\n\n\nCtrl-C pressed\n\n\n");
-    }
-
     if (mode == MODE_NORMAL) {
       if (numRead == 1 && buf[1] == 1) { // Ctrl-A
         mode = MODE_CONTROL;
@@ -122,6 +119,15 @@ void event_loop(int sock) {
   reset_mode();
 }
 
+void *receive_messages(void *socket_desc) {
+  int sock = *(int *)socket_desc;
+
+  while (1) {
+    receive_message(sock);
+  }
+  pthread_exit(NULL);
+}
+
 int client() {
   signal(SIGINT, ctrl_c_callback);
 
@@ -140,18 +146,18 @@ int client() {
     return EXIT_FAILURE;
   }
 
-  printf("\033[?1049h"); // Alternate screen
-  pid_t pid = fork();
-  if (pid == 0) { // Child
-    while (1) {
-      receive_message_from_server(sock);
-    }
-  } else {
-    event_loop(sock);
-    kill(pid, SIGKILL);
-  }
+  write(STDOUT_FILENO, "\033[?1049h", 8); // Alternate screen
 
+  pthread_t thread;
+  pthread_create(&thread, NULL, receive_messages, (void *)&sock);
+
+  event_loop(sock);
+
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
   close(sock);
-  printf("\033[?1049l"); // Normal screen
+
+  write(STDOUT_FILENO, "\033[?1049l", 8); // Normal screen
+
   return EXIT_SUCCESS;
 }
