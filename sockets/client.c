@@ -136,11 +136,78 @@ void event_loop(int sock) {
       handle_key(numRead, buf, sock, "cNext", 'n');
       handle_key(numRead, buf, sock, "cPrev", 'p');
 
+      // Arrow keys
+      if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 68) {
+        write(sock, "cLeft", 5);
+      } else if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 67) {
+        write(sock, "cRight", 6);
+      } else if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 65) {
+        write(sock, "cUp", 3);
+      } else if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 66) {
+        write(sock, "cDown", 5);
+      }
+
+      // Rename window
+      if (numRead == 1 && buf[1] == ',') {
+        reset_mode();
+        struct winsize ws;
+        ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+        uint32_t width = ws.ws_col;
+        uint32_t height = ws.ws_row;
+
+        printf("\033[%d;1H", height);
+        printf("\033[K");
+
+        char *input = readline("Rename Window: ");
+        char buf[32];
+        sprintf(buf, "cRenameWindow %s", input);
+        write(sock, buf, strlen(buf));
+        raw_mode();
+      }
+
+      // Rename session
+      if (numRead == 1 && buf[1] == '$') {
+        reset_mode();
+        struct winsize ws;
+        ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+        uint32_t width = ws.ws_col;
+        uint32_t height = ws.ws_row;
+
+        printf("\033[%d;1H", height);
+        printf("\033[K");
+
+        char *input = readline("Rename Session: ");
+        char buf[32];
+        sprintf(buf, "cRenameSession %s", input);
+        write(sock, buf, strlen(buf));
+        raw_mode();
+      }
+
+      if (numRead == 1 && buf[1] == 'n') {
+        send_size(sock);
+      }
+
+      if (numRead == 1 && buf[1] == 'p') {
+        send_size(sock);
+      }
+
+      if (numRead == 1 && buf[1] == 's') {
+        mode = MODE_CONTROL_STICKY;
+      }
+
       if (numRead == 1 && buf[1] == 'q') {
         break;
       }
 
-      mode = MODE_NORMAL;
+      if (mode == MODE_CONTROL_STICKY) {
+        if (numRead == 1 && buf[1] == 1) { // Ctrl-A
+          mode = MODE_NORMAL;
+        }
+      }
+
+      if (mode == MODE_CONTROL) {
+        mode = MODE_NORMAL;
+      }
     }
   }
 
@@ -156,11 +223,11 @@ void *receive_messages(void *socket_desc) {
   pthread_exit(NULL);
 }
 
-int client() {
+int client(int port) {
   signal(SIGINT, ctrl_c_callback);
 
   struct sockaddr_in server;
-  configure_server(&server);
+  configure_server(&server, port);
 
   int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock == -1) {
