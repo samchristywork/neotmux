@@ -20,7 +20,18 @@ int num_sessions = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #define MAX_NAME 1024
 
-void init_screen(VTerm **vt, VTermScreen **vts, int h, int w) {
+int term_prop_callback(VTermProp prop, VTermValue *val, void *user) {
+  Pane *pane = (Pane *)user;
+  if (prop == VTERM_PROP_CURSORVISIBLE) {
+    Window *current_window = &sessions->windows[sessions->current_window];
+    Pane *current_pane = &current_window->panes[current_window->current_pane];
+    current_pane->process.cursor_visible = val->boolean;
+  }
+
+  return 0;
+}
+
+void init_screen(VTerm **vt, VTermScreen **vts, int h, int w, Pane *pane) {
   *vt = vterm_new(h, w);
   if (!vt) {
     exit(EXIT_FAILURE);
@@ -33,7 +44,7 @@ void init_screen(VTerm **vt, VTermScreen **vts, int h, int w) {
   callbacks.damage = NULL;
   callbacks.moverect = NULL;
   callbacks.movecursor = NULL;
-  callbacks.settermprop = NULL;
+  callbacks.settermprop = term_prop_callback;
   callbacks.bell = NULL;
   callbacks.resize = NULL;
   callbacks.sb_pushline = NULL;
@@ -42,7 +53,7 @@ void init_screen(VTerm **vt, VTermScreen **vts, int h, int w) {
   vterm_set_utf8(*vt, 1);
   vterm_screen_reset(*vts, 1);
   vterm_screen_enable_altscreen(*vts, 1);
-  vterm_screen_set_callbacks(*vts, &callbacks, NULL);
+  vterm_screen_set_callbacks(*vts, &callbacks, pane);
 }
 
 void add_process_to_pane(Pane *pane) {

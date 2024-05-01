@@ -359,5 +359,26 @@ void render_screen(int fd) {
   bb_write(buf, n);
   numRenders++;
 
+  Pane *current_pane = &currentWindow->panes[currentWindow->current_pane];
+
+  {
+    VTermPos cursorPos;
+    VTermState *state = vterm_obtain_state(current_pane->process.vt);
+    vterm_state_get_cursorpos(state, &cursorPos);
+    cursorPos.row += currentPane->row;
+    cursorPos.col += currentPane->col;
+
+    bb_write("\033[", 2);
+    char buf[32];
+    int n = snprintf(buf, 32, "%d;%dH", cursorPos.row + 1, cursorPos.col + 1);
+    bb_write(buf, n);
+  }
+
+  if (current_pane->process.cursor_visible) {
+    bb_write("\033[?25h", 6); // Show cursor
+  } else {
+    bb_write("\033[?25l", 6); // Hide cursor
+  }
+
   write(fd, bb.buffer, bb.n);
 }
