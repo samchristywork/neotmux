@@ -12,6 +12,10 @@ enum BarPosition { TOP, BOTTOM };
 
 int barPos = BOTTOM;
 int bold = 0;
+int inverted = 0;
+int underline = 0;
+int italic = 0;
+int strike = 0;
 VTermColor bg = {0};
 VTermColor fg = {0};
 
@@ -33,17 +37,19 @@ BackBuffer bb;
   } while (0)
 
 unsigned int utf8_seqlen(long codepoint) {
-  if (codepoint < 0x0000080)
+  if (codepoint < 0x0000080) {
     return 1;
-  if (codepoint < 0x0000800)
+  } else if (codepoint < 0x0000800) {
     return 2;
-  if (codepoint < 0x0010000)
+  } else if (codepoint < 0x0010000) {
     return 3;
-  if (codepoint < 0x0200000)
+  } else if (codepoint < 0x0200000) {
     return 4;
-  if (codepoint < 0x4000000)
+  } else if (codepoint < 0x4000000) {
     return 5;
-  return 6;
+  } else {
+    return 6;
+  }
 }
 
 int fill_utf8(long codepoint, char *str) {
@@ -89,25 +95,28 @@ bool is_in_rect(int row, int col, int rowRect, int colRect, int height,
 bool compare_colors(VTermColor a, VTermColor b) {
   if (a.type != b.type) {
     return false;
-  }
-
-  if (a.type == VTERM_COLOR_DEFAULT_FG || a.type == VTERM_COLOR_DEFAULT_BG) {
+  } else if (a.type == VTERM_COLOR_DEFAULT_FG ||
+             a.type == VTERM_COLOR_DEFAULT_BG) {
     return true;
-  }
-
-  if (VTERM_COLOR_IS_INDEXED(&a) && VTERM_COLOR_IS_INDEXED(&b)) {
+  } else if (VTERM_COLOR_IS_INDEXED(&a) && VTERM_COLOR_IS_INDEXED(&b)) {
     return a.indexed.idx == b.indexed.idx;
-  }
-
-  if (VTERM_COLOR_IS_RGB(&a) && VTERM_COLOR_IS_RGB(&b)) {
+  } else if (VTERM_COLOR_IS_RGB(&a) && VTERM_COLOR_IS_RGB(&b)) {
     return a.rgb.red == b.rgb.red && a.rgb.green == b.rgb.green &&
            a.rgb.blue == b.rgb.blue;
+  } else {
+    return false;
   }
-
-  return false;
 }
 
+void bb_write_rgb(int red, int green, int blue, int type);
+
+// TODO: Interpolate into rgb colors
 void bb_write_indexed(int idx, int type) {
+  if (idx == 1) {
+    bb_write_rgb(255, 0, 0, type);
+    return;
+  }
+
   char buf[32];
   int n = snprintf(buf, 32, "\033[%d;5;%dm", type, idx);
   bb_write(buf, n);
@@ -121,8 +130,48 @@ void bb_write_rgb(int red, int green, int blue, int type) {
 
 void render_cell(VTermScreenCell cell) {
   if (cell.attrs.bold != bold) {
-    bb_write("\033[1m", 4);
+    if (cell.attrs.bold) {
+      bb_write("\033[1m", 4); // Enable bold
+    } else {
+      bb_write("\033[22m", 5); // Disable bold
+    }
     bold = cell.attrs.bold;
+  }
+
+  if (cell.attrs.reverse != inverted) {
+    if (cell.attrs.reverse) {
+      bb_write("\033[7m", 4); // Enable reverse
+    } else {
+      bb_write("\033[27m", 5); // Disable reverse
+    }
+    inverted = cell.attrs.reverse;
+  }
+
+  if (cell.attrs.underline != underline) {
+    if (cell.attrs.underline) {
+      bb_write("\033[4m", 4); // Enable underline
+    } else {
+      bb_write("\033[24m", 5); // Disable underline
+    }
+    underline = cell.attrs.underline;
+  }
+
+  if (cell.attrs.italic != italic) {
+    if (cell.attrs.italic) {
+      bb_write("\033[3m", 4); // Enable italic
+    } else {
+      bb_write("\033[23m", 5); // Disable italic
+    }
+    italic = cell.attrs.italic;
+  }
+
+  if (cell.attrs.strike != strike) {
+    if (cell.attrs.strike) {
+      bb_write("\033[9m", 4); // Enable strike
+    } else {
+      bb_write("\033[29m", 5); // Disable strike
+    }
+    strike = cell.attrs.strike;
   }
 
   if (!compare_colors(cell.bg, bg)) {
@@ -192,6 +241,11 @@ void status_bar(int cols) {
       bb_write("*", 1);
       width++;
     }
+
+    if (window->zoom != -1) {
+      bb_write("Z", 1);
+      width += 1;
+    }
   }
 
   char hostname[50];
@@ -224,6 +278,10 @@ void clear_style() {
   bzero(&bg, sizeof(bg));
   bzero(&fg, sizeof(fg));
   bold = 0;
+  inverted = 0;
+  strike = 0;
+  underline = 0;
+  italic = 0;
   bb_write("\033[0m", 4);
 }
 
@@ -259,8 +317,7 @@ void write_border_character(int row, int col, Window *window) {
   bool d = is_border_here(row + 1, col, window);
   bool u = is_border_here(row - 1, col, window);
 
-  if (false) {
-  } else if (u && d && l && r) {
+  if (u && d && l && r) {
     bb_write("┼", 3);
   } else if (u && d && l && !r) {
     bb_write("┤", 3);
@@ -295,8 +352,8 @@ void render_screen(int fd) {
 
   bb_write("\033[H", 3); // Move cursor to top left
 
-  if (barPos == TOP) {
-    status_bar(cols);
+  bb_write("\033[H", 3); // Move cursor to top left
+  if (barPos == BAR_TOP) {
     bb_write("\r\n", 2);
   }
 
@@ -348,16 +405,14 @@ void render_screen(int fd) {
     }
   }
 
-  if (barPos == BOTTOM) {
-    bb_write("\r\n", 2);
-    status_bar(cols);
+  // TODO: This should be done asynchronously
+  if (barPos == BAR_TOP) {
+    status_bar(cols, 1);
+  } else if (barPos == BAR_BOTTOM) {
+    status_bar(cols, rows + 1);
   }
 
-  static int numRenders = 0;
-  char buf[100];
-  int n = snprintf(buf, 100, "\nRendered %d times", numRenders);
-  bb_write(buf, n);
-  numRenders++;
+  info_bar(rows + 2);
 
   Pane *current_pane = &currentWindow->panes[currentWindow->current_pane];
 
@@ -378,6 +433,20 @@ void render_screen(int fd) {
     bb_write("\033[?25h", 6); // Show cursor
   } else {
     bb_write("\033[?25l", 6); // Hide cursor
+  }
+
+  switch (current_pane->process.cursor_shape) {
+  case VTERM_PROP_CURSORSHAPE_BLOCK:
+    bb_write("\033[0 q", 6); // Block cursor
+    break;
+  case VTERM_PROP_CURSORSHAPE_UNDERLINE:
+    bb_write("\033[3 q", 6); // Underline cursor
+    break;
+  case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
+    bb_write("\033[5 q", 6); // Vertical bar cursor
+    break;
+  default:
+    break;
   }
 
   write(fd, bb.buffer, bb.n);
