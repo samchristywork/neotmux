@@ -496,13 +496,34 @@ bool handle_input(int socket, char *buf, int read_size) {
   return true;
 }
 
+void reorder_panes(Window *w) {
+  printf("Reordering panes\n");
+  for (int i = 0; i < w->pane_count; i++) {
+    Pane *p = &w->panes[i];
+    if (p->process.closed) {
+      for (int j = i; j < w->pane_count - 1; j++) {
+        w->panes[j] = w->panes[j + 1];
+      }
+      w->pane_count--;
+      i--;
+    }
+  }
+  if (w->current_pane >= w->pane_count) {
+    w->current_pane = w->pane_count - 1;
+  }
+}
+
 void *client_handler(void *socket_desc) {
   int socket = *(int *)socket_desc;
   int frame = 0;
 
+  pthread_mutex_lock(&mutex);
   printf("Client connected (%d)\n", socket);
+  Session *session = &neotmux->sessions[neotmux->current_session];
+  Window *w = &session->windows[session->current_window];
+  render_screen(socket, w->height, w->width);
+  pthread_mutex_unlock(&mutex);
 
-  bool dirty = true;
   while (1) {
     int sixty_fps = 1000000 / 60;
     struct timeval tv = {.tv_sec = 0, .tv_usec = sixty_fps};
@@ -511,8 +532,9 @@ void *client_handler(void *socket_desc) {
     FD_SET(socket, &fds);
     int max_fd = socket;
 
-    for (int i = 0; i < num_sessions; i++) {
-      Window w = sessions[i].windows[sessions[i].current_window];
+    for (int i = 0; i < neotmux->session_count; i++) {
+      Session *session = &neotmux->sessions[i];
+      Window w = session[i].windows[session[i].current_window];
       for (int j = 0; j < w.pane_count; j++) {
         Pane p = w.panes[j];
         if (p.process.closed) {
@@ -532,8 +554,9 @@ void *client_handler(void *socket_desc) {
       break;
     }
 
-    for (int i = 0; i < num_sessions; i++) {
-      Window *w = &sessions[i].windows[sessions[i].current_window];
+    for (int i = 0; i < neotmux->session_count; i++) {
+      Session *session = &neotmux->sessions[i];
+      Window *w = &session[i].windows[session[i].current_window];
       for (int j = 0; j < w->pane_count; j++) {
         Pane *p = &w->panes[j];
         if (FD_ISSET(p->process.fd, &fds)) {
@@ -550,9 +573,10 @@ void *client_handler(void *socket_desc) {
           } else if (read_size == -1) {
             p->process.closed = true;
             printf("Process closed (%d)\n", p->process.fd);
+            reorder_panes(w);
+            calculate_layout(w);
             continue;
           }
-          // write(socket, buf, read_size);
           vterm_input_write(p->process.vt, buf, read_size);
           dirty = true;
         }
@@ -567,7 +591,8 @@ void *client_handler(void *socket_desc) {
       }
     } else if (retval == 0) { // Timeout
       if (dirty) {
-        Window *w = &sessions->windows[sessions->current_window];
+        Session *session = &neotmux->sessions[neotmux->current_session];
+        Window *w = &session->windows[session->current_window];
         render_screen(socket, w->height, w->width);
         dirty = false;
       }
