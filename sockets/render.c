@@ -5,12 +5,12 @@
 
 #include "session.h"
 
-extern Session *sessions;
-extern int num_sessions;
+extern Neotmux *neotmux;
 
-enum BarPosition { TOP, BOTTOM };
+enum BarPosition { BAR_TOP, BAR_BOTTOM };
 
-int barPos = BOTTOM;
+int barPos = BAR_BOTTOM;
+
 int bold = 0;
 int inverted = 0;
 int underline = 0;
@@ -19,19 +19,20 @@ int strike = 0;
 VTermColor bg = {0};
 VTermColor fg = {0};
 
-// TODO: Determine the correct buffer size
-// This is less inefficient than it seems because the memory is statically
-// allocated.
-#define BUF_SIZE 100000
-
+// TODO: Change the name of this struct
 typedef struct BackBuffer {
-  char buffer[BUF_SIZE];
+  char *buffer;
   int n;
+  int capacity;
 } BackBuffer;
-BackBuffer bb;
+BackBuffer bb = {0};
 
 #define bb_write(buf, count)                                                   \
   do {                                                                         \
+    if (bb.n + count >= bb.capacity) {                                         \
+      bb.capacity *= 2;                                                        \
+      bb.buffer = realloc(bb.buffer, bb.capacity);                             \
+    }                                                                          \
     memcpy(bb.buffer + bb.n, buf, count);                                      \
     bb.n += count;                                                             \
   } while (0)
@@ -347,10 +348,13 @@ void write_border_character(int row, int col, Window *window) {
 void render_screen(int fd) {
   bb.n = 0;
 
-  int cols = 80;
-  int rows = 12;
+void render_screen(int fd, int rows, int cols) {
+  if (bb.buffer == NULL) {
+    bb.buffer = malloc(100);
+    bb.capacity = 100;
+  }
 
-  bb_write("\033[H", 3); // Move cursor to top left
+  bb.n = 0;
 
   bb_write("\033[H", 3); // Move cursor to top left
   if (barPos == BAR_TOP) {
