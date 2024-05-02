@@ -206,14 +206,72 @@ void render_cell(VTermScreenCell cell) {
   }
 }
 
+void bb_pos(int row, int col) {
+  char buf[32];
+  int n = snprintf(buf, 32, "\033[%d;%dH", row, col);
+  bb_write(buf, n);
+}
+
 void bb_color(int color) {
   char buf[32];
   int n = snprintf(buf, 32, "\033[38;5;%dm", color);
   bb_write(buf, n);
 }
 
+char *write_command(int *len, char *command) {
+  FILE *fp = popen(command, "r");
+  if (fp == NULL) {
+    return NULL;
+  }
+
+  char *ret = malloc(100);
+  int n = fread(ret, 1, 100, fp);
+  for (int i = 0; i < n; i++) {
+    if (ret[i] == '\n') {
+      ret[i] = 0;
+      n = i;
+      break;
+    }
+  }
+  *len = n;
+  pclose(fp);
+  return ret;
+}
+
+void status_bar_new(int cols, int row) {
+  bb_pos(row, 1);
+  bb_write("\033[7m", 4); // Invert colors
+  bb_color(2);
+
+  int l, m, r;
+  char *left = write_command(&l, "date");
+  char *mid = write_command(&m, "hostname");
+  char *right = write_command(&r, "pwd");
+
+  int remaining = cols - l - m - r;
+
+  bb_write(left, strlen(left));
+  for (int i = 0; i < remaining; i++) {
+    bb_write(" ", 1);
+    remaining--;
+  }
+  bb_write(mid, strlen(mid));
+  for (int i = 0; i < remaining; i++) {
+    bb_write(" ", 1);
+  }
+  bb_write(right, strlen(right));
+
+  free(left);
+  free(mid);
+  free(right);
+
+  clear_style();
+}
+
 // TODO: Handle overflow condition
-void status_bar(int cols) {
+void status_bar(int cols, int row) {
+  bb_pos(row, 1);
+
   int width = 0;
   Session *session = &neotmux->sessions[neotmux->current_session];
   Window *current_window = &session->windows[session->current_window];
@@ -403,11 +461,14 @@ void render_screen(int fd, int rows, int cols) {
       }
       if (!isRendered) {
         clear_style();
-        write_border_character(row, col, currentWindow);
-      }
-      if (cursorPos.row == row - currentPane->row &&
-          cursorPos.col == col - currentPane->col) {
-        bb_write("\033[0m", 4);
+
+        if (borders_active_pane(row, col, currentWindow)) {
+          bb_color(2);
+          write_border_character(row, col, currentWindow);
+          bb_write("\033[0m", 4);
+        } else {
+          write_border_character(row, col, currentWindow);
+        }
       }
     }
     if (row < rows - 1) {
