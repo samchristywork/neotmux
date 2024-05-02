@@ -214,8 +214,32 @@ void event_loop(int sock) {
   reset_mode();
 }
 
+void send_size(int sock) {
+  struct winsize ws;
+  ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+  uint32_t width = ws.ws_col;
+  uint32_t height = ws.ws_row;
+  height--; // Make room for debug info bar
+  height--; // Make room for status bar
+
+  char buf[9];
+  bzero(buf, 9);
+  buf[0] = 's';
+  memcpy(buf + 1, &width, sizeof(uint32_t));
+  memcpy(buf + 5, &height, sizeof(uint32_t));
+  write(sock, buf, 9);
+}
+
+int resize_socket;
+void resize_callback(int sig) { send_size(resize_socket); }
+
 void *receive_messages(void *socket_desc) {
   int sock = *(int *)socket_desc;
+
+  resize_socket = sock;
+  signal(SIGWINCH, resize_callback);
+
+  send_size(sock);
 
   while (1) {
     receive_message(sock);
@@ -230,6 +254,7 @@ int client(int port) {
   configure_server(&server, port);
 
   int sock = socket(AF_INET, SOCK_STREAM, 0);
+  ctrl_c_socket = sock;
   if (sock == -1) {
     perror("Could not create socket");
     close(sock);
