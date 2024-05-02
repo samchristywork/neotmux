@@ -306,24 +306,118 @@ bool handle_input(int socket, char *buf, int read_size) {
     printf("\n");
     fflush(stdout);
 
-    pthread_mutex_lock(&mutex);
-    Window w = sessions->windows[sessions->current_window];
-    Pane p = w.panes[w.current_pane];
-    int fd = p.process.fd;
-    write(fd, buf + 1, read_size - 1);
-    pthread_mutex_unlock(&mutex);
-  } else if (buf[0] == 'c') {
-    char commandString[read_size];
-    strncpy(commandString, buf + 1, read_size - 1);
+    if (read_size == 7 && buf[1] == '\033' && buf[2] == '[' && buf[3] == 'M') {
+      printf("Mouse event (%d): ", socket);
 
-    if (strcmp(commandString, "Create") == 0) {
+      // Must be unsigned
+      int b = (unsigned char)buf[4] & 0x03;
+      int x = (unsigned char)buf[5] - 0x20;
+      int y = (unsigned char)buf[6] - 0x20;
+
+      printf("%d, %d, %d\n", x, y, b);
+      fflush(stdout);
+
+      if (b == 0) {
+        printf("Left click\n");
+        Session *session = &neotmux->sessions[neotmux->current_session];
+        Window *w = &session->windows[session->current_window];
+        for (int i = 0; i < w->pane_count; i++) {
+          printf("Checking pane %d\n", i);
+          printf("  %d, %d, %d, %d\n", w->panes[i].col, w->panes[i].row,
+                 w->panes[i].width, w->panes[i].height);
+          Pane *p = &w->panes[i];
+          if (within_rect(x - 1, y - 1, p->col, p->row, p->width, p->height)) {
+            printf("Found pane %d\n", i);
+            w->current_pane = i;
+            calculate_layout(w);
+            dirty = true;
+            break;
+          }
+        }
+      }
+
+      Session *session = &neotmux->sessions[neotmux->current_session];
+      Window *window = &session->windows[session->current_window];
+      Pane *pane = &window->panes[window->current_pane];
+
+      // VTERM_PROP_MOUSE_NONE = 0,
+      // VTERM_PROP_MOUSE_CLICK,
+      // VTERM_PROP_MOUSE_DRAG,
+      // VTERM_PROP_MOUSE_MOVE,
+      // TODO: Handle all mouse states
+      if (pane->process.mouse != VTERM_PROP_MOUSE_NONE) {
+        pthread_mutex_lock(&mutex);
+        write(pane->process.fd, buf + 1, read_size - 1);
+        // TODO: This triggers a redraw, which we might not want.
+        pthread_mutex_unlock(&mutex);
+      }
+    } else {
       pthread_mutex_lock(&mutex);
-      add_window(sessions, "New Window");
-      print_sessions(sessions, num_sessions);
+      Session *session = &neotmux->sessions[neotmux->current_session];
+      Window w = session->windows[session->current_window];
+      Pane p = w.panes[w.current_pane];
+      int fd = p.process.fd;
+      write(fd, buf + 1, read_size - 1);
       pthread_mutex_unlock(&mutex);
-    } else if (strcmp(commandString, "List") == 0) {
-      pthread_mutex_lock(&mutex);
-      print_sessions(sessions, num_sessions);
+    }
+  } else if (buf[0] == 'c') { // Command
+    char cmd[read_size];
+    memcpy(cmd, buf + 1, read_size - 1);
+    cmd[read_size - 1] = '\0';
+
+    pthread_mutex_lock(&mutex);
+    Session *session = &neotmux->sessions[neotmux->current_session];
+    Window *w = &session->windows[session->current_window];
+
+    if (strcmp(cmd, "Create") == 0) {
+      Session *session = &neotmux->sessions[neotmux->current_session];
+      Window *window = add_window(session, "New Window");
+      add_pane(window, 0, 0, window->width, window->height);
+      add_process_to_pane(&window->panes[0]);
+      calculate_layout(window);
+      dirty = true;
+    } else if (strcmp(cmd, "VSplit") == 0) {
+      Pane *currentPane = &w->panes[w->current_pane];
+      int col = currentPane->col;
+      int row = currentPane->row;
+      int width = currentPane->width;
+      int height = currentPane->height;
+
+      Pane *newPane = add_pane(w, col, row, width, height);
+      add_process_to_pane(newPane);
+      calculate_layout(w);
+      w->current_pane = w->pane_count - 1;
+      dirty = true;
+    } else if (strcmp(cmd, "Split") == 0) {
+      Pane *currentPane = &w->panes[w->current_pane];
+      int col = currentPane->col;
+      int row = currentPane->row;
+      int width = currentPane->width;
+      int height = currentPane->height;
+
+      Pane *newPane = add_pane(w, col, row, width, height);
+      add_process_to_pane(newPane);
+      calculate_layout(w);
+      w->current_pane = w->pane_count - 1;
+      dirty = true;
+    } else if (strcmp(cmd, "List") == 0) {
+      print_sessions(neotmux);
+    } else if (strcmp(cmd, "Next") == 0) {
+      Session *session = &neotmux->sessions[neotmux->current_session];
+      session->current_window++;
+      if (session->current_window >= session->window_count) {
+        session->current_window = 0;
+      }
+      calculate_layout(&session->windows[session->current_window]);
+      dirty = true;
+    } else if (strcmp(cmd, "Prev") == 0) {
+      Session *session = &neotmux->sessions[neotmux->current_session];
+      session->current_window--;
+      if (session->current_window < 0) {
+        session->current_window = session->window_count - 1;
+      }
+      calculate_layout(&session->windows[session->current_window]);
+      dirty = true;
     } else if (strcmp(cmd, "Left") == 0) {
       w->current_pane = left(w);
       dirty = true;
@@ -335,6 +429,53 @@ bool handle_input(int socket, char *buf, int read_size) {
       dirty = true;
     } else if (strcmp(cmd, "Down") == 0) {
       w->current_pane = down(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Even_Horizontal") == 0) {
+      printf("Even Horizontal\n");
+      w->layout = LAYOUT_EVEN_HORIZONTAL;
+      calculate_layout(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Even_Vertical") == 0) {
+      printf("Even Vertical\n");
+      w->layout = LAYOUT_EVEN_VERTICAL;
+      calculate_layout(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Main_Horizontal") == 0) {
+      printf("Main Horizontal\n");
+      w->layout = LAYOUT_MAIN_HORIZONTAL;
+      calculate_layout(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Main_Vertical") == 0) {
+      printf("Main Vertical\n");
+      w->layout = LAYOUT_MAIN_VERTICAL;
+      calculate_layout(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Tiled") == 0) {
+      printf("Tiled\n");
+      w->layout = LAYOUT_TILED;
+      calculate_layout(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Zoom") == 0) {
+      if (w->zoom == -1) {
+        w->zoom = w->current_pane;
+      } else {
+        w->zoom = -1;
+      }
+      calculate_layout(w);
+      dirty = true;
+    } else if (memcmp(cmd, "RenameWindow", 12) == 0) {
+      printf("Rename Window\n");
+      Window *window = &session->windows[session->current_window];
+      free(window->title);
+      char *title = strdup(cmd + 13);
+      window->title = title;
+      dirty = true;
+    } else if (memcmp(cmd, "RenameSession", 13) == 0) {
+      printf("Rename Session\n");
+      Session *session = &neotmux->sessions[neotmux->current_session];
+      free(session->title);
+      char *title = strdup(cmd + 14);
+      session->title = title;
       dirty = true;
     } else if (strcmp(cmd, "Reload") == 0) {
       printf("Reloading (%d)\n", socket);
