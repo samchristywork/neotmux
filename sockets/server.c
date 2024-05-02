@@ -603,16 +603,27 @@ void *client_handler(void *socket_desc) {
   return 0;
 }
 
-int server() {
-  initialize_session();
+int server(int port) {
+  neotmux = malloc(sizeof(*neotmux));
+  neotmux->sessions = NULL;
+  neotmux->session_count = 0;
+  neotmux->current_session = 0;
+  Session *s = add_session(neotmux, "Main Session");
+  Window *w = add_window(s, "Main Window");
+  Pane *p = add_pane(w, 0, 0, w->width, w->height);
+  add_process_to_pane(p);
+  print_sessions(neotmux);
+
+  signal(SIGINT, ctrl_c);
 
   int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+  ctrl_c_socket_desc = socket_desc;
   if (socket_desc == -1) {
     printf("Could not create socket");
     return EXIT_FAILURE;
   }
 
-  struct sockaddr_in server = setup_server(socket_desc);
+  struct sockaddr_in server = setup_server(socket_desc, port);
   while (1) {
     wait_for_connections(socket_desc);
     struct sockaddr_in client;
