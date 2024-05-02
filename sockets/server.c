@@ -1,7 +1,9 @@
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,21 +13,32 @@
 #include <unistd.h>
 #include <vterm.h>
 
+#include "layout.h"
 #include "pty.h"
 #include "render.h"
 #include "session.h"
 
-Session *sessions = NULL;
-int num_sessions = 0;
+bool dirty = true; // TODO: Dirty should be on a per-pane basis
+Neotmux *neotmux;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #define MAX_NAME 1024
+
+int ctrl_c_socket_desc;
+void ctrl_c(int sig) {
+  signal(SIGINT, ctrl_c);
+  close(ctrl_c_socket_desc);
+  printf("\nExiting...\n");
+  exit(EXIT_SUCCESS);
+}
 
 int term_prop_callback(VTermProp prop, VTermValue *val, void *user) {
   Pane *pane = (Pane *)user;
   if (prop == VTERM_PROP_CURSORVISIBLE) {
-    Window *current_window = &sessions->windows[sessions->current_window];
-    Pane *current_pane = &current_window->panes[current_window->current_pane];
-    current_pane->process.cursor_visible = val->boolean;
+    pane->process.cursor_visible = val->boolean;
+  } else if (prop == VTERM_PROP_CURSORSHAPE) {
+    pane->process.cursor_shape = val->number;
+  } else if (prop == VTERM_PROP_MOUSE) {
+    pane->process.mouse = val->number;
   }
 
   return 0;
@@ -58,8 +71,8 @@ void init_screen(VTerm **vt, VTermScreen **vts, int h, int w, Pane *pane) {
 
 void add_process_to_pane(Pane *pane) {
   struct winsize ws;
-  ws.ws_col = 80;
-  ws.ws_row = 12;
+  ws.ws_col = pane->width;
+  ws.ws_row = pane->height;
   ws.ws_xpixel = 0;
   ws.ws_ypixel = 0;
 
@@ -79,30 +92,15 @@ void add_process_to_pane(Pane *pane) {
   pane->process.name = malloc(strlen(childName) + 1);
   strcpy(pane->process.name, childName);
 
-  init_screen(&pane->process.vt, &pane->process.vts, ws.ws_row, ws.ws_col);
+  init_screen(&pane->process.vt, &pane->process.vts, ws.ws_row, ws.ws_col,
+              pane);
 }
 
-void initialize_session() {
-  sessions = malloc(sizeof(*sessions));
-  sessions->title = "Main Session";
-  sessions->window_count = 0;
-  sessions->current_window = 0;
-  num_sessions++;
-
-  Window *window = add_window(sessions, "Main Window");
-  add_pane(window, 0, 0, 80, 12);
-
-  Pane *pane = &window->panes[0];
-  add_process_to_pane(pane);
-
-  print_sessions(sessions, num_sessions);
-}
-
-struct sockaddr_in setup_server(int socket_desc) {
+struct sockaddr_in setup_server(int socket_desc, int port) {
   struct sockaddr_in server;
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = htons(8888);
+  server.sin_port = htons(port);
 
   if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0) {
     puts("bind failed");
@@ -215,17 +213,88 @@ int down(Window *w) {
   }
 }
 
+// TODO: This should happen on the client side
+char *get_user_input(int socket, char *prompt) {
+  write(socket, "NTMUX_GET_INPUT", 15);
+  // char buf[1024];
+  // int read_size = recv(socket, buf, 1024, 0);
+  // if (read_size == 0) {
+  //   printf("Client disconnected (%d)\n", socket);
+  //   fflush(stdout);
+  //   return NULL;
+  // } else if (read_size == -1) {
+  //   perror("recv failed");
+  //   return NULL;
+  // } else {
+  //   char *ret = malloc(read_size+1);
+  //   memcpy(ret, buf, read_size);
+  //   ret[read_size] = '\0';
+  //   return ret;
+  // }
+  // return NULL;
+
+  // char input[1024];
+  // int idx = 0;
+
+  // Session *session = &neotmux->sessions[neotmux->current_session];
+  // Window *window = &session->windows[session->current_window];
+  // char buf[32];
+  // int n = snprintf(buf, 32, "\033[%d;%dH", window->height + 1, 1);
+  // write(socket, buf, n);
+
+  // char *clear_line = "\033[2K";
+  // write(socket, clear_line, strlen(clear_line));
+
+  // send(socket, prompt, strlen(prompt), 0);
+  // while (true) {
+  //   char buf[2];
+  //   int read_size = recv(socket, buf, 2, 0);
+  //   if (read_size == 0) {
+  //     printf("Client disconnected (%d)\n", socket);
+  //     fflush(stdout);
+  //     return NULL;
+  //   } else if (read_size == -1) {
+  //     perror("recv failed");
+  //     return NULL;
+  //   } else if (read_size == 2 && buf[0] == 'e') {
+  //     if (buf[1] == '\n') {
+  //       input[idx] = '\0';
+  //       return strdup(input);
+  //     } else {
+  //       input[idx++] = buf[1];
+  //       send(socket, buf + 1, 1, 0);
+  //     }
+  //   }
+  // }
+}
+
 // TODO: Rework this code
 // All possible inputs should have an associated message
 bool handle_input(int socket, char *buf, int read_size) {
-  if (read_size == 0) {
+  if (read_size == 0) { // Client disconnected
     printf("Client disconnected (%d)\n", socket);
     fflush(stdout);
     return false;
-  } else if (read_size == -1) {
+  } else if (read_size == -1) { // Error
     perror("recv failed");
     return false;
-  } else if (buf[0] == 'e') {
+  } else if (buf[0] == 's') { // Size
+    uint32_t width;
+    uint32_t height;
+    memcpy(&width, buf + 1, sizeof(uint32_t));
+    memcpy(&height, buf + 5, sizeof(uint32_t));
+    printf("Size (%d): %d, %d\n", socket, width, height);
+    Session *session = &neotmux->sessions[neotmux->current_session];
+    Window *window = &session->windows[session->current_window];
+    window->width = width;
+    window->height = height;
+    calculate_layout(window);
+    dirty = true;
+  } else if (buf[0] == 'e') { // Event
+    if (read_size > 7) {
+      read_size = 7; // TODO: Fix this
+    }
+
     printf("Received (%d):", socket);
     for (int i = 1; i < read_size; i++) {
       if (isprint(buf[i])) {
