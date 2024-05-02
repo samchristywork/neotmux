@@ -215,12 +215,13 @@ void bb_color(int color) {
 // TODO: Handle overflow condition
 void status_bar(int cols) {
   int width = 0;
-  Window *current_window = &sessions->windows[sessions->current_window];
+  Session *session = &neotmux->sessions[neotmux->current_session];
+  Window *current_window = &session->windows[session->current_window];
 
   bb_write("\033[7m", 4); // Invert colors
   bb_color(2);
 
-  char *sessionName = sessions->title;
+  char *sessionName = session->title;
   bb_write("[", 1);
   width++;
 
@@ -230,8 +231,8 @@ void status_bar(int cols) {
   bb_write("]", 1);
   width += 1;
 
-  for (int i = 0; i < sessions->window_count; i++) {
-    Window *window = &sessions->windows[i];
+  for (int i = 0; i < session->window_count; i++) {
+    Window *window = &session->windows[i];
     bb_write("  ", 2);
     width += 2;
 
@@ -345,8 +346,15 @@ void write_border_character(int row, int col, Window *window) {
   }
 }
 
-void render_screen(int fd) {
-  bb.n = 0;
+void info_bar(int row) {
+  bb_pos(row, 1);
+  bb_write("\033[2K", 4); // Clear line
+  static int numRenders = 0;
+  char buf[100];
+  int n = snprintf(buf, 100, "Rendered %d times", numRenders);
+  bb_write(buf, n);
+  numRenders++;
+}
 
 void render_screen(int fd, int rows, int cols) {
   if (bb.buffer == NULL) {
@@ -361,20 +369,19 @@ void render_screen(int fd, int rows, int cols) {
     bb_write("\r\n", 2);
   }
 
-  VTermPos cursorPos;
-  Window *currentWindow = &sessions->windows[sessions->current_window];
+  Session *session = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow = &session->windows[session->current_window];
   Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
-  vterm_state_get_cursorpos(vterm_obtain_state(currentPane->process.vt),
-                            &cursorPos);
 
   for (int row = 0; row < rows; row++) {
+    clear_style();
     for (int col = 0; col < cols; col++) {
-      if (cursorPos.row == row - currentPane->row &&
-          cursorPos.col == col - currentPane->col) {
-        bb_write("\033[7m", 4); // Invert colors
-      }
       bool isRendered = false;
       for (int k = 0; k < currentWindow->pane_count; k++) {
+        if (currentWindow->zoom != -1 && k != currentWindow->zoom) {
+          continue;
+        }
+
         Pane *pane = &currentWindow->panes[k];
         if (pane->process.closed) {
           continue;
@@ -426,6 +433,10 @@ void render_screen(int fd, int rows, int cols) {
     vterm_state_get_cursorpos(state, &cursorPos);
     cursorPos.row += currentPane->row;
     cursorPos.col += currentPane->col;
+
+    if (barPos == BAR_TOP) {
+      cursorPos.row++;
+    }
 
     bb_write("\033[", 2);
     char buf[32];
