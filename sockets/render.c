@@ -9,15 +9,7 @@ extern Neotmux *neotmux;
 
 enum BarPosition { BAR_TOP, BAR_BOTTOM };
 
-int barPos = BAR_BOTTOM;
-
-int bold = 0;
-int inverted = 0;
-int underline = 0;
-int italic = 0;
-int strike = 0;
-VTermColor bg = {0};
-VTermColor fg = {0};
+VTermScreenCell prevCell = {0};
 
 // TODO: Change the name of this struct
 typedef struct BackBuffer {
@@ -130,68 +122,70 @@ void bb_write_rgb(int red, int green, int blue, int type) {
 }
 
 void render_cell(VTermScreenCell cell) {
-  if (cell.attrs.bold != bold) {
+  if (cell.attrs.bold != prevCell.attrs.bold) {
     if (cell.attrs.bold) {
       bb_write("\033[1m", 4); // Enable bold
     } else {
       bb_write("\033[22m", 5); // Disable bold
     }
-    bold = cell.attrs.bold;
+    prevCell.attrs.bold = cell.attrs.bold;
   }
 
-  if (cell.attrs.reverse != inverted) {
+  if (cell.attrs.reverse != prevCell.attrs.reverse) {
     if (cell.attrs.reverse) {
       bb_write("\033[7m", 4); // Enable reverse
     } else {
       bb_write("\033[27m", 5); // Disable reverse
     }
-    inverted = cell.attrs.reverse;
+    prevCell.attrs.reverse = cell.attrs.reverse;
   }
 
-  if (cell.attrs.underline != underline) {
+  if (cell.attrs.underline != prevCell.attrs.underline) {
     if (cell.attrs.underline) {
       bb_write("\033[4m", 4); // Enable underline
     } else {
       bb_write("\033[24m", 5); // Disable underline
     }
-    underline = cell.attrs.underline;
+    prevCell.attrs.underline = cell.attrs.underline;
   }
 
-  if (cell.attrs.italic != italic) {
+  if (cell.attrs.italic != prevCell.attrs.italic) {
     if (cell.attrs.italic) {
       bb_write("\033[3m", 4); // Enable italic
     } else {
       bb_write("\033[23m", 5); // Disable italic
     }
-    italic = cell.attrs.italic;
+    prevCell.attrs.italic = cell.attrs.italic;
   }
 
-  if (cell.attrs.strike != strike) {
+  if (cell.attrs.strike != prevCell.attrs.strike) {
     if (cell.attrs.strike) {
       bb_write("\033[9m", 4); // Enable strike
     } else {
       bb_write("\033[29m", 5); // Disable strike
     }
-    strike = cell.attrs.strike;
+    prevCell.attrs.strike = cell.attrs.strike;
   }
 
-  if (!compare_colors(cell.bg, bg)) {
+  if (!compare_colors(cell.bg, prevCell.bg)) {
     if (cell.bg.type == VTERM_COLOR_DEFAULT_BG) {
     } else if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
       bb_write_indexed(cell.bg.indexed.idx, 48);
+      prevCell.bg = cell.bg;
     } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
       bb_write_rgb(cell.bg.rgb.red, cell.bg.rgb.green, cell.bg.rgb.blue, 48);
+      prevCell.bg = cell.bg;
     }
     bg = cell.bg;
   }
 
-  if (!compare_colors(cell.fg, fg)) {
+  if (!compare_colors(cell.fg, prevCell.fg)) {
     if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
       bb_write_indexed(cell.fg.indexed.idx, 38);
     } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
       bb_write_rgb(cell.fg.rgb.red, cell.fg.rgb.green, cell.fg.rgb.blue, 38);
     }
-    fg = cell.fg;
+    prevCell.fg = cell.fg;
   }
 
   if (cell.chars[0] == 0) {
@@ -335,14 +329,8 @@ void status_bar(int cols, int row) {
 }
 
 void clear_style() {
-  bzero(&bg, sizeof(bg));
-  bzero(&fg, sizeof(fg));
-  bold = 0;
-  inverted = 0;
-  strike = 0;
-  underline = 0;
-  italic = 0;
-  bb_write("\033[0m", 4);
+  prevCell = (VTermScreenCell){0};
+  bb_write("\033[0m", 4); // Reset style
 }
 
 bool is_border_here(int row, int col, Window *window) {
