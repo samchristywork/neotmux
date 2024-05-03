@@ -1,6 +1,6 @@
 #ifndef STATUSBAR_H
 #define STATUSBAR_H
 
-void status_bar(int cols);
+void write_status_bar(int cols);
 
 #endif

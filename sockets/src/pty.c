@@ -10,7 +10,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-int pty_open(char *childName, size_t len) {
+int open_pseudoterminal(char *childName, size_t len) {
   int fd = posix_openpt(O_RDWR | O_NOCTTY);
   if (fd == -1) {
     exit(EXIT_FAILURE);
@@ -38,10 +38,10 @@ int pty_open(char *childName, size_t len) {
   return fd;
 }
 
-pid_t pty_fork(int *parentFd, char *childName, size_t len,
-               const struct winsize *ws) {
+pid_t fork_pseudoterminal(int *parentFd, char *childName, size_t len,
+                          const struct winsize *ws) {
   char name[len];
-  int fd = pty_open(name, len);
+  int fd = open_pseudoterminal(name, len);
   if (fd == -1) {
     exit(EXIT_FAILURE);
   }

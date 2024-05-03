@@ -4,7 +4,7 @@
 #include <lua5.4/lua.h>
 #include <stdbool.h>
 
-bool exec_file(lua_State *L, const char *filename);
+bool execute_lua_file(lua_State *L, const char *filename);
 void load_plugins(lua_State *lua);
 
 #endif

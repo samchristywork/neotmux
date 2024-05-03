@@ -1,12 +1,12 @@
 #include "move.h"
 #include "session.h"
 
-int rect_contains(VTermRect r, VTermPos p) {
+int is_within_rect(VTermRect r, VTermPos p) {
   return p.row >= r.start_row && p.row < r.end_row && p.col >= r.start_col &&
          p.col < r.end_col;
 }
 
-int left(Window *w) {
+int move_left(Window *w) {
   Pane *currentPane = &w->panes[w->current_pane];
   int col = currentPane->col;
   int row = currentPane->row;
@@ -24,7 +24,7 @@ int left(Window *w) {
                           .end_col = pane->col + pane->width,
                           .end_row = pane->row + pane->height};
         VTermPos pos = {.col = col, .row = r};
-        if (rect_contains(rect, pos)) {
+        if (is_within_rect(rect, pos)) {
           return i;
         }
       }
@@ -33,7 +33,7 @@ int left(Window *w) {
   }
 }
 
-int right(Window *w) {
+int move_right(Window *w) {
   Pane *currentPane = &w->panes[w->current_pane];
   int col = currentPane->col;
   int row = currentPane->row;
@@ -51,7 +51,7 @@ int right(Window *w) {
                           .end_col = pane->col + pane->width,
                           .end_row = pane->row + pane->height};
         VTermPos pos = {.col = col, .row = r};
-        if (rect_contains(rect, pos)) {
+        if (is_within_rect(rect, pos)) {
           return i;
         }
       }
@@ -60,7 +60,7 @@ int right(Window *w) {
   }
 }
 
-int up(Window *w) {
+int move_up(Window *w) {
   Pane *currentPane = &w->panes[w->current_pane];
   int col = currentPane->col;
   int row = currentPane->row;
@@ -78,7 +78,7 @@ int up(Window *w) {
                           .end_col = pane->col + pane->width,
                           .end_row = pane->row + pane->height};
         VTermPos pos = {.col = c, .row = row};
-        if (rect_contains(rect, pos)) {
+        if (is_within_rect(rect, pos)) {
           return i;
         }
       }
@@ -87,7 +87,7 @@ int up(Window *w) {
   }
 }
 
-int down(Window *w) {
+int move_down(Window *w) {
   Pane *currentPane = &w->panes[w->current_pane];
   int col = currentPane->col;
   int row = currentPane->row;
@@ -105,7 +105,7 @@ int down(Window *w) {
                           .end_col = pane->col + pane->width,
                           .end_row = pane->row + pane->height};
         VTermPos pos = {.col = c, .row = row};
-        if (rect_contains(rect, pos)) {
+        if (is_within_rect(rect, pos)) {
           return i;
         }
       }
@@ -114,16 +114,16 @@ int down(Window *w) {
   }
 }
 
-int direction(int d, Window *w) {
+int move_active_pane(int d, Window *w) {
   switch (d) {
   case LEFT:
-    return left(w);
+    return move_left(w);
   case RIGHT:
-    return right(w);
+    return move_right(w);
   case UP:
-    return up(w);
+    return move_up(w);
   case DOWN:
-    return down(w);
+    return move_down(w);
   default:
     return -1;
   }

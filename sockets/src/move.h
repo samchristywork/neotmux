@@ -3,8 +3,8 @@
 
 #include "session.h"
 
-enum direction {LEFT, RIGHT, UP, DOWN};
+enum direction { LEFT, RIGHT, UP, DOWN };
 
-int direction(int d, Window *w);
+int move_active_pane(int d, Window *w);
 
 #endif

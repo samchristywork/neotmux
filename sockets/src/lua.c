@@ -7,7 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
-int get_global_int(lua_State *L, const char *name) {
+int get_lua_int(lua_State *L, const char *name) {
   lua_getglobal(L, name);
   if (!lua_isinteger(L, -1)) {
     lua_pop(L, 1);
@@ -18,19 +18,7 @@ int get_global_int(lua_State *L, const char *name) {
   return result;
 }
 
-// TODO: Allow for arguments to be passed to the function
-void call_function(lua_State *L, const char *function) {
-  lua_getglobal(L, function);
-  if (!lua_isfunction(L, -1)) {
-    lua_pop(L, 1);
-    return;
-  } else if (lua_pcall(L, 0, 0, 0)) {
-    fprintf(stderr, "Cannot run function: %s\n", lua_tostring(L, -1));
-    lua_pop(L, 1);
-  }
-}
-
-char *function_to_string(lua_State *L, const char *function) {
+char *apply_lua_string_function(lua_State *L, const char *function) {
   lua_getglobal(L, function);
   if (!lua_isfunction(L, -1)) {
     lua_pop(L, 1);

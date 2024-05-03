@@ -17,7 +17,7 @@ enum Mode { MODE_NORMAL, MODE_CONTROL, MODE_CONTROL_STICKY };
 fd_set fds;
 
 // Write a u32 representing the size of the message followed by the message
-ssize_t message(int sock, char *buf, size_t len) {
+ssize_t write_message(int sock, char *buf, size_t len) {
   uint32_t size = len;
   if (write(sock, &size, sizeof(uint32_t)) != sizeof(uint32_t)) {
     return -1;
@@ -26,13 +26,13 @@ ssize_t message(int sock, char *buf, size_t len) {
 }
 
 int ctrl_c_socket;
-void ctrl_c_callback(int sig) {
+void handle_sigint(int sig) {
   char buf[2];
   buf[0] = 'e';
   buf[1] = 3;
-  message(ctrl_c_socket, buf, 2);
+  write_message(ctrl_c_socket, buf, 2);
 
-  signal(sig, ctrl_c_callback);
+  signal(sig, handle_sigint);
 }
 
 void enable_mouse_tracking() {
@@ -45,7 +45,7 @@ void disable_mouse_tracking() {
   // write(STDOUT_FILENO, "\033[?1006l", 8); // Extended mouse tracking
 }
 
-void raw_mode() {
+void enter_raw_mode() {
   tcgetattr(STDIN_FILENO, &term);
   term.c_lflag &= ~(ICANON | ECHO);
   tcsetattr(STDIN_FILENO, TCSANOW, &term);
@@ -105,15 +105,15 @@ void handle_binding(int numRead, char *buf, int sock, char *command,
                     char *binding) {
   if (numRead == strlen(binding) &&
       strncmp(buf + 1, binding, strlen(binding)) == 0) {
-    message(sock, command, strlen(command));
+    write_message(sock, command, strlen(command));
   }
 }
 
 // TODO: Delete this
 void send_size(int sock);
 
-void event_loop(int sock) {
-  raw_mode();
+void handle_events(int sock) {
+  enter_raw_mode();
 
   int mode = MODE_NORMAL;
   char buf[32];
@@ -127,20 +127,20 @@ void event_loop(int sock) {
     if (mode == MODE_NORMAL) {
       // Alt+hjkl
       if (n == 2 && buf[1] == 27 && buf[2] == 'h') {
-        message(sock, "cLeft", 5);
+        write_message(sock, "cLeft", 5);
       } else if (n == 2 && buf[1] == 27 && buf[2] == 'l') {
-        message(sock, "cRight", 6);
-      } else if (n == 2 && buf[1] == 27 && buf[2] == 'j') {
-        message(sock, "cUp", 3);
+        write_message(sock, "cRight", 6);
       } else if (n == 2 && buf[1] == 27 && buf[2] == 'k') {
-        message(sock, "cDown", 5);
+        write_message(sock, "cUp", 3);
+      } else if (n == 2 && buf[1] == 27 && buf[2] == 'j') {
+        write_message(sock, "cDown", 5);
       } else if (n == 1 && buf[1] == 1) { // Ctrl-A
         mode = MODE_CONTROL;
       } else if (n == 1 && buf[1] == 10) { // Enter
         buf[1] = 13;                       // Change newline to carriage return
-        message(sock, buf, n + 1);
+        write_message(sock, buf, n + 1);
       } else {
-        message(sock, buf, n + 1);
+        write_message(sock, buf, n + 1);
       }
     } else if (mode == MODE_CONTROL || mode == MODE_CONTROL_STICKY) {
       // TODO: Change to lua
@@ -185,9 +185,9 @@ void event_loop(int sock) {
         char *input = readline("Name of New Window: ");
         char buf[32];
         sprintf(buf, "cRenameWindow %s", input);
-        message(sock, "cCreate", 7);
-        message(sock, buf, strlen(buf));
-        raw_mode();
+        write_message(sock, "cCreate", 7);
+        write_message(sock, buf, strlen(buf));
+        enter_raw_mode();
       }
 
       // Rename window
@@ -204,8 +204,8 @@ void event_loop(int sock) {
         char *input = readline("Rename Window: ");
         char buf[32];
         sprintf(buf, "cRenameWindow %s", input);
-        message(sock, buf, strlen(buf));
-        raw_mode();
+        write_message(sock, buf, strlen(buf));
+        enter_raw_mode();
       }
 
       // Rename session
@@ -222,8 +222,8 @@ void event_loop(int sock) {
         char *input = readline("Rename Session: ");
         char buf[32];
         sprintf(buf, "cRenameSession %s", input);
-        message(sock, buf, strlen(buf));
-        raw_mode();
+        write_message(sock, buf, strlen(buf));
+        enter_raw_mode();
       }
 
       if (n == 1 && buf[1] == 'n') {
@@ -270,17 +270,17 @@ void send_size(int sock) {
   buf[0] = 's';
   memcpy(buf + 1, &width, sizeof(uint32_t));
   memcpy(buf + 5, &height, sizeof(uint32_t));
-  message(sock, buf, 9);
+  write_message(sock, buf, 9);
 }
 
 int resize_socket;
-void resize_callback(int sig) { send_size(resize_socket); }
+void handle_resize(int sig) { send_size(resize_socket); }
 
 void *receive_messages(void *socket_desc) {
   int sock = *(int *)socket_desc;
 
   resize_socket = sock;
-  signal(SIGWINCH, resize_callback);
+  signal(SIGWINCH, handle_resize);
 
   send_size(sock);
 
@@ -293,8 +293,8 @@ void *receive_messages(void *socket_desc) {
   exit(EXIT_SUCCESS);
 }
 
-int client(int port) {
-  signal(SIGINT, ctrl_c_callback);
+int start_client(int port) {
+  signal(SIGINT, handle_sigint);
 
   struct sockaddr_in server;
   configure_server(&server, port);
@@ -317,7 +317,7 @@ int client(int port) {
   pthread_t thread;
   pthread_create(&thread, NULL, receive_messages, (void *)&sock);
 
-  event_loop(sock);
+  handle_events(sock);
 
   pthread_cancel(thread);
   pthread_join(thread, NULL);

@@ -52,11 +52,11 @@ typedef struct Session {
   int current_window;
 } Session;
 
-typedef struct BackBuffer {
+typedef struct Buffer {
   char *buffer;
   int n;
   int capacity;
-} BackBuffer;
+} Buffer;
 
 typedef struct Neotmux {
   Session *sessions;
@@ -64,11 +64,11 @@ typedef struct Neotmux {
   int current_session;
   pthread_mutex_t mutex;
   lua_State *lua;
-  BackBuffer bb;
+  Buffer bb;
   VTermScreenCell prevCell;
 } Neotmux;
 
-#define bb_write(buf, count)                                                   \
+#define buf_write(buf, count)                                                  \
   do {                                                                         \
     if (neotmux->bb.n + count >= neotmux->bb.capacity) {                       \
       neotmux->bb.capacity *= 2;                                               \
@@ -78,11 +78,11 @@ typedef struct Neotmux {
     neotmux->bb.n += count;                                                    \
   } while (0)
 
-#define bb_color(color)                                                        \
+#define buf_color(color)                                                       \
   do {                                                                         \
     char buf[32];                                                              \
     int n = snprintf(buf, 32, "\033[38;5;%dm", color);                         \
-    bb_write(buf, n);                                                          \
+    buf_write(buf, n);                                                         \
   } while (0)
 
 #endif

@@ -6,9 +6,9 @@ extern Neotmux *neotmux;
 
 // TODO: Change to lua
 
-bool layout_function(lua_State *L, const char *function, int *col, int *row,
-                     int *width, int *height, int index, int nPanes,
-                     int winWidth, int winHeight) {
+bool call_lua_layout_function(lua_State *L, const char *function, int *col,
+                              int *row, int *width, int *height, int index,
+                              int nPanes, int winWidth, int winHeight) {
   lua_getglobal(L, function);
   if (!lua_isfunction(L, -1)) {
     lua_pop(L, 1);
@@ -48,7 +48,7 @@ void update_layout(Window *w) {
   }
 }
 
-void even_horizontal_layout(Window *w) {
+void apply_even_horizontal_layout(Window *w) {
   Pane *panes = w->panes;
 
   int remaining = w->width - w->pane_count + 1;
@@ -67,7 +67,7 @@ void even_horizontal_layout(Window *w) {
   update_layout(w);
 }
 
-void even_vertical_layout(Window *w) {
+void apply_even_vertical_layout(Window *w) {
   Pane *panes = w->panes;
 
   int remaining = w->height - w->pane_count + 1;
@@ -86,11 +86,11 @@ void even_vertical_layout(Window *w) {
   update_layout(w);
 }
 
-void main_horizontal_layout(Window *w) {
+void apply_main_horizontal_layout(Window *w) {
   Pane *panes = w->panes;
 
   if (w->pane_count <= 1) {
-    even_vertical_layout(w);
+    apply_even_vertical_layout(w);
     return;
   }
 
@@ -113,11 +113,11 @@ void main_horizontal_layout(Window *w) {
   update_layout(w);
 }
 
-void main_vertical_layout(Window *w) {
+void apply_main_vertical_layout(Window *w) {
   Pane *panes = w->panes;
 
   if (w->pane_count <= 1) {
-    even_horizontal_layout(w);
+    apply_even_horizontal_layout(w);
     return;
   }
 
@@ -140,7 +140,7 @@ void main_vertical_layout(Window *w) {
   update_layout(w);
 }
 
-void tiled_layout(Window *w) {
+void apply_tiled_layout(Window *w) {
   Pane *panes = w->panes;
 
   int rows = 1;
@@ -177,13 +177,14 @@ void tiled_layout(Window *w) {
 }
 
 // TODO: Fix how borders work to make this look correct
-void custom_layout(Window *w) {
+void apply_custom_layout(Window *w) {
   Pane *panes = w->panes;
 
   for (int i = 0; i < w->pane_count; i++) {
     int col, row, width, height;
-    if (layout_function(neotmux->lua, "layout_custom", &col, &row, &width,
-                        &height, i, w->pane_count, w->width, w->height)) {
+    if (call_lua_layout_function(neotmux->lua, "layout_custom", &col, &row,
+                                 &width, &height, i, w->pane_count, w->width,
+                                 w->height)) {
       panes[i].row = row;
       panes[i].col = col;
       panes[i].height = height;
@@ -207,22 +208,22 @@ void calculate_layout(Window *window) {
       // TODO: Implement default layout
       break;
     case LAYOUT_EVEN_HORIZONTAL:
-      even_horizontal_layout(window);
+      apply_even_horizontal_layout(window);
       break;
     case LAYOUT_EVEN_VERTICAL:
-      even_vertical_layout(window);
+      apply_even_vertical_layout(window);
       break;
     case LAYOUT_MAIN_HORIZONTAL:
-      main_horizontal_layout(window);
+      apply_main_horizontal_layout(window);
       break;
     case LAYOUT_MAIN_VERTICAL:
-      main_vertical_layout(window);
+      apply_main_vertical_layout(window);
       break;
     case LAYOUT_TILED:
-      tiled_layout(window);
+      apply_tiled_layout(window);
       break;
     case LAYOUT_CUSTOM:
-      custom_layout(window);
+      apply_custom_layout(window);
       break;
     default:
       break;

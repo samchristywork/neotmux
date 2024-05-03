@@ -16,71 +16,20 @@
 #include <unistd.h>
 #include <vterm.h>
 
+#include "create.h"
 #include "layout.h"
 #include "lua.h"
+#include "mouse.h"
 #include "move.h"
 #include "print_session.h"
-#include "pty.h"
 #include "render.h"
 #include "session.h"
 
 bool dirty = true; // TODO: Dirty should be on a per-pane basis
 Neotmux *neotmux;
 
-Pane *add_pane(Window *window, int col, int row, int width, int height) {
-  int n = sizeof(*window->panes) * (window->pane_count + 1);
-  window->panes = realloc(window->panes, n);
-  Pane *pane = &window->panes[window->pane_count];
-  pane->col = col;
-  pane->row = row;
-  pane->width = width;
-  pane->height = height;
-  pane->process.pid = -1;
-  pane->process.name = NULL;
-  pane->process.fd = -1;
-  pane->process.closed = false;
-  pane->process.cursor_visible = true;
-  pane->process.mouse = VTERM_PROP_MOUSE_NONE;
-  window->pane_count++;
-  return pane;
-}
-
-Window *add_window(Session *session, char *title) {
-  int n = sizeof(*session->windows) * (session->window_count + 1);
-  session->windows = realloc(session->windows, n);
-  Window *window = &session->windows[session->window_count];
-  window->title = malloc(strlen(title) + 1);
-  strcpy(window->title, title);
-  window->pane_count = 0;
-  window->current_pane = 0;
-  window->panes = NULL;
-  window->layout = LAYOUT_MAIN_VERTICAL;
-  window->width = 80;
-  window->height = 24;
-  window->zoom = -1;
-  session->window_count++;
-  return window;
-}
-
-Session *add_session(Neotmux *neotmux, char *title) {
-  if (neotmux->sessions == NULL) {
-    neotmux->sessions = malloc(sizeof(*neotmux->sessions));
-  } else {
-    int n = sizeof(*neotmux->sessions) * (neotmux->session_count + 1);
-    neotmux->sessions = realloc(neotmux->sessions, n);
-  }
-  Session *session = &neotmux->sessions[neotmux->session_count];
-  session->title = malloc(strlen(title) + 1);
-  strcpy(session->title, title);
-  session->window_count = 0;
-  session->current_window = 0;
-  session->windows = NULL;
-  neotmux->session_count++;
-  return session;
-}
-
 // Read a u32 representing the size of the message followed by the message
-ssize_t receive(int sock, char *buf, size_t len) {
+ssize_t read_message(int sock, char *buf, size_t len) {
   // call_function(neotmux->lua, "helloWorld");
   uint32_t size;
   if (read(sock, &size, sizeof(uint32_t)) != sizeof(uint32_t)) {
@@ -90,126 +39,11 @@ ssize_t receive(int sock, char *buf, size_t len) {
 }
 
 int ctrl_c_socket_desc;
-void ctrl_c(int sig) {
-  signal(SIGINT, ctrl_c);
+void handle_ctrl_c(int sig) {
+  signal(SIGINT, handle_ctrl_c);
   close(ctrl_c_socket_desc);
   printf("\nExiting...\n");
   exit(EXIT_SUCCESS);
-}
-
-int term_prop_callback(VTermProp prop, VTermValue *val, void *user) {
-  Pane *pane = (Pane *)user;
-  if (prop == VTERM_PROP_CURSORVISIBLE) {
-    pane->process.cursor_visible = val->boolean;
-  } else if (prop == VTERM_PROP_CURSORSHAPE) {
-    pane->process.cursor_shape = val->number;
-  } else if (prop == VTERM_PROP_MOUSE) {
-    pane->process.mouse = val->number;
-  }
-
-  return 0;
-}
-
-int push_line_callback(int cols, const VTermScreenCell *cells, void *user) {
-  // TODO: Copy these lines into scrollback buffer
-  // Pane *pane = (Pane *)user;
-  // printf("Cols: %d\n", cols);
-  // for (int i = 0; i < cols; i++) {
-  //  printf("%c", cells[i].chars[0]);
-  //}
-  // printf("\n");
-  return 0;
-}
-
-void init_screen(VTerm **vt, VTermScreen **vts, int h, int w, Pane *pane) {
-  *vt = vterm_new(h, w);
-  if (!vt) {
-    exit(EXIT_FAILURE);
-  }
-
-  *vts = vterm_obtain_screen(*vt);
-
-  // TODO: Implement callbacks
-  static VTermScreenCallbacks callbacks;
-  callbacks.damage = NULL;
-  callbacks.moverect = NULL;
-  callbacks.movecursor = NULL;
-  callbacks.settermprop = term_prop_callback;
-  callbacks.bell = NULL;
-  callbacks.resize = NULL;
-  callbacks.sb_pushline = push_line_callback; // TODO: Use for scrolling
-  callbacks.sb_popline = NULL;                // TODO: Use for scrolling
-
-  vterm_set_utf8(*vt, 1);
-  vterm_screen_reset(*vts, 1);
-  vterm_screen_enable_altscreen(*vts, 1);
-  vterm_screen_set_callbacks(*vts, &callbacks, pane);
-}
-
-bool get_global_boolean(lua_State *L, const char *name) {
-  lua_getglobal(L, name);
-  if (!lua_isboolean(L, -1)) {
-    lua_pop(L, 1);
-    return false;
-  }
-  bool result = lua_toboolean(L, -1);
-  lua_pop(L, 1);
-  return result;
-}
-
-char *get_global_string(lua_State *L, const char *name) {
-  lua_getglobal(L, name);
-  if (!lua_isstring(L, -1)) {
-    lua_pop(L, 1);
-    return NULL;
-  }
-  char *result = strdup(lua_tostring(L, -1));
-  lua_pop(L, 1);
-  return result;
-}
-
-void add_process_to_pane(Pane *pane) {
-  bool keepDir = get_global_boolean(neotmux->lua, "keep_dir");
-  struct winsize ws = {0};
-  ws.ws_col = pane->width;
-  ws.ws_row = pane->height;
-
-  char childName[PATH_MAX];
-  pid_t childPid = pty_fork(&pane->process.fd, childName, PATH_MAX, &ws);
-  if (childPid == -1) {
-    exit(EXIT_FAILURE);
-  } else if (childPid == 0) { // Child
-    if (keepDir) {
-      Session *session = &neotmux->sessions[neotmux->current_session];
-      if (session->window_count > 0) {
-        Window *window = &session->windows[session->current_window];
-        if (window->pane_count > 0) {
-          Pane *pane = &window->panes[window->current_pane];
-          char cwd[PATH_MAX] = {0};
-          char link[PATH_MAX] = {0};
-          sprintf(link, "/proc/%d/cwd", pane->process.pid);
-          if (readlink(link, cwd, sizeof(cwd)) != -1) {
-            chdir(cwd);
-          }
-        }
-      }
-    }
-
-    char *shell = get_global_string(neotmux->lua, "shell");
-    if (!shell) {
-      shell = getenv("SHELL");
-    }
-
-    execlp(shell, shell, (char *)NULL);
-    exit(EXIT_FAILURE);
-  }
-
-  pane->process.pid = childPid;
-  pane->process.name = malloc(strlen(childName) + 1);
-  strcpy(pane->process.name, childName);
-
-  init_screen(&pane->process.vt, &pane->process.vts, ws.ws_row, ws.ws_col,
-              pane);
 }
 
 struct sockaddr_in setup_server(int socket_desc, int port) {
@@ -241,21 +75,16 @@ int accept_connection(int socket_desc, struct sockaddr_in client) {
   return socket;
 }
 
-bool within_rect(VTermRect rect, VTermPos pos) {
-  return pos.col >= rect.start_col && pos.col < rect.end_col &&
-         pos.row >= rect.start_row && pos.row < rect.end_row;
-}
-
 // TODO: Rework this code
 // All possible inputs should have an associated message
 bool handle_input(int socket, char *buf, int read_size) {
   if (read_size == 0) { // Client disconnected
     printf("Client disconnected (%d)\n", socket);
-    ctrl_c(0); // TODO: This is a hack
+    handle_ctrl_c(0); // TODO: This is a hack
     return false;
   } else if (read_size == -1) { // Error
     printf("Error reading from client (%d)\n", socket);
-    ctrl_c(0); // TODO: This is a hack
+    handle_ctrl_c(0); // TODO: This is a hack
     return false;
   } else if (buf[0] == 's') { // Size
     uint32_t width;
@@ -286,52 +115,8 @@ bool handle_input(int socket, char *buf, int read_size) {
     fflush(stdout);
 
     if (read_size == 7 && buf[1] == '\033' && buf[2] == '[' && buf[3] == 'M') {
-      printf("Mouse event (%d): ", socket);
-
-      // Must be unsigned
-      int b = (unsigned char)buf[4] & 0x03;
-      int x = (unsigned char)buf[5] - 0x20;
-      int y = (unsigned char)buf[6] - 0x20;
-
-      printf("%d, %d, %d\n", x, y, b);
-      fflush(stdout);
-
-      if (b == 0) {
-        printf("Left click\n");
-        Session *session = &neotmux->sessions[neotmux->current_session];
-        Window *w = &session->windows[session->current_window];
-        for (int i = 0; i < w->pane_count; i++) {
-          printf("Checking pane %d\n", i);
-          printf("  %d, %d, %d, %d\n", w->panes[i].col, w->panes[i].row,
-                 w->panes[i].width, w->panes[i].height);
-          Pane *p = &w->panes[i];
-          VTermRect rect = {.start_col = p->col,
-                            .start_row = p->row,
-                            .end_col = p->col + p->width,
-                            .end_row = p->row + p->height};
-          VTermPos pos = {.col = x - 1, .row = y - 1};
-          if (within_rect(rect, pos)) {
-            printf("Found pane %d\n", i);
-            w->current_pane = i;
-            calculate_layout(w);
-            dirty = true;
-            break;
-          }
-        }
-      }
-
-      Session *session = &neotmux->sessions[neotmux->current_session];
-      Window *window = &session->windows[session->current_window];
-      Pane *pane = &window->panes[window->current_pane];
-
-      // VTERM_PROP_MOUSE_NONE = 0,
-      // VTERM_PROP_MOUSE_CLICK,
-      // VTERM_PROP_MOUSE_DRAG,
-      // VTERM_PROP_MOUSE_MOVE,
-      // TODO: Handle all mouse states
-      if (pane->process.mouse != VTERM_PROP_MOUSE_NONE) {
-        write(pane->process.fd, buf + 1, read_size - 1);
-        // TODO: This triggers a redraw, which we might not want.
+      if (handle_mouse(socket, buf, read_size)) {
+        dirty = true;
       }
     } else {
       Session *session = &neotmux->sessions[neotmux->current_session];
@@ -351,17 +136,19 @@ bool handle_input(int socket, char *buf, int read_size) {
     if (strcmp(cmd, "Create") == 0) {
       Session *session = &neotmux->sessions[neotmux->current_session];
       Window *window;
-      char *title = get_global_string(neotmux->lua, "default_title");
-      if (title) {
-        window = add_window(session, title);
-        free(title);
-      } else {
+
+      lua_getglobal(neotmux->lua, "default_title");
+      if (!lua_isstring(neotmux->lua, -1)) {
         window = add_window(session, "New Window");
+      } else {
+        char *name = (char *)lua_tostring(neotmux->lua, -1);
+        window = add_window(session, name);
+        lua_pop(neotmux->lua, 1);
       }
+
       window->width = w->width;
       window->height = w->height;
-      add_pane(window, 0, 0, window->width, window->height);
-      add_process_to_pane(&window->panes[0]);
+      add_pane(window);
       session->current_window = session->window_count - 1;
       calculate_layout(&session->windows[session->current_window]);
       dirty = true;
@@ -372,8 +159,7 @@ bool handle_input(int socket, char *buf, int read_size) {
       int width = currentPane->width;
       int height = currentPane->height;
 
-      Pane *newPane = add_pane(w, col, row, width, height);
-      add_process_to_pane(newPane);
+      Pane *newPane = add_pane(w);
       calculate_layout(w);
       w->current_pane = w->pane_count - 1;
       dirty = true;
@@ -384,8 +170,7 @@ bool handle_input(int socket, char *buf, int read_size) {
       int width = currentPane->width;
       int height = currentPane->height;
 
-      Pane *newPane = add_pane(w, col, row, width, height);
-      add_process_to_pane(newPane);
+      Pane *newPane = add_pane(w);
       calculate_layout(w);
       w->current_pane = w->pane_count - 1;
       dirty = true;
@@ -408,16 +193,16 @@ bool handle_input(int socket, char *buf, int read_size) {
       calculate_layout(&session->windows[session->current_window]);
       dirty = true;
     } else if (strcmp(cmd, "Left") == 0) {
-      w->current_pane = direction(LEFT, w);
+      w->current_pane = move_active_pane(LEFT, w);
       dirty = true;
     } else if (strcmp(cmd, "Right") == 0) {
-      w->current_pane = direction(RIGHT, w);
+      w->current_pane = move_active_pane(RIGHT, w);
       dirty = true;
     } else if (strcmp(cmd, "Up") == 0) {
-      w->current_pane = direction(UP, w);
+      w->current_pane = move_active_pane(UP, w);
       dirty = true;
     } else if (strcmp(cmd, "Down") == 0) {
-      w->current_pane = direction(DOWN, w);
+      w->current_pane = move_active_pane(DOWN, w);
       dirty = true;
     } else if (strcmp(cmd, "Even_Horizontal") == 0) {
       printf("Even Horizontal\n");
@@ -549,15 +334,14 @@ void reorder_panes(Window *w) {
   }
 }
 
-void *client_handler(void *socket_desc) {
+void *handle_client(void *socket_desc) {
   static bool initialized = false;
   if (!initialized) {
     initialized = true;
     Session *s = add_session(neotmux, "Main");
     Window *w = add_window(s, "Main");
     for (int i = 0; i < 3; i++) {
-      Pane *p = add_pane(w, 0, 0, w->width, w->height);
-      add_process_to_pane(p);
+      add_pane(w);
     }
   }
 
@@ -644,7 +428,7 @@ void *client_handler(void *socket_desc) {
     pthread_mutex_lock(&neotmux->mutex);
     if (retval && FD_ISSET(socket, &fds)) {
       char buf[32];
-      int read_size = receive(socket, buf, 32);
+      int read_size = read_message(socket, buf, 32);
       if (!handle_input(socket, buf, read_size)) {
         break;
       }
@@ -654,7 +438,7 @@ void *client_handler(void *socket_desc) {
         if (session->window_count == 0) {
           printf("No windows\n");
           send(socket, "e", 1, 0);
-          ctrl_c(0); // TODO: This is a hack
+          handle_ctrl_c(0); // TODO: This is a hack
         }
         Window *w = &session->windows[session->current_window];
         render_screen(socket, w->height, w->width);
@@ -668,7 +452,7 @@ void *client_handler(void *socket_desc) {
   return 0;
 }
 
-int server(int port) {
+int start_server(int port) {
   neotmux = malloc(sizeof(*neotmux));
   neotmux->sessions = NULL;
   neotmux->session_count = 0;
@@ -685,21 +469,21 @@ int server(int port) {
   char dotfile[PATH_MAX];
   snprintf(dotfile, PATH_MAX, "%s/.ntmux.lua", home);
 
-  if (!exec_file(neotmux->lua, "default.lua")) {
+  if (!execute_lua_file(neotmux->lua, "default.lua")) {
     return EXIT_FAILURE;
   }
 
   load_plugins(neotmux->lua);
 
-  if (!exec_file(neotmux->lua, dotfile)) {
+  if (!execute_lua_file(neotmux->lua, dotfile)) {
     return EXIT_FAILURE;
   }
 
-  if (!exec_file(neotmux->lua, "init.lua")) {
+  if (!execute_lua_file(neotmux->lua, "init.lua")) {
     return EXIT_FAILURE;
   }
 
-  signal(SIGINT, ctrl_c);
+  signal(SIGINT, handle_ctrl_c);
 
   int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
   ctrl_c_socket_desc = socket_desc;
@@ -716,7 +500,7 @@ int server(int port) {
     *socket = accept_connection(socket_desc, client);
 
     pthread_t t;
-    if (pthread_create(&t, NULL, client_handler, (void *)socket) < 0) {
+    if (pthread_create(&t, NULL, handle_client, (void *)socket) < 0) {
       perror("Could not create thread");
       return EXIT_FAILURE;
     }

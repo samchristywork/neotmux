@@ -9,7 +9,7 @@
 
 extern Neotmux *neotmux;
 
-#define bb_write2(buf, count)                                                  \
+#define buf_write2(buf, count)                                                 \
   do {                                                                         \
     if (neotmux->bb.n + count >= neotmux->bb.capacity) {                       \
       neotmux->bb.capacity *= 2;                                               \
@@ -19,7 +19,7 @@ extern Neotmux *neotmux;
     neotmux->bb.n += count;                                                    \
   } while (0)
 
-unsigned int utf8_seqlen(long codepoint) {
+unsigned int calculate_utf8_length(long codepoint) {
   if (codepoint < 0x0000080) {
     return 1;
   } else if (codepoint < 0x0000800) {
@@ -36,7 +36,7 @@ unsigned int utf8_seqlen(long codepoint) {
 }
 
 int fill_utf8(long codepoint, char *str) {
-  int nbytes = utf8_seqlen(codepoint);
+  int nbytes = calculate_utf8_length(codepoint);
 
   int b = nbytes;
   while (b > 1) {
@@ -85,7 +85,7 @@ bool compare_colors(VTermColor a, VTermColor b) {
   }
 }
 
-int function_exists(lua_State *L, const char *function) {
+int has_lua_function(lua_State *L, const char *function) {
   printf("Checking if function exists: %s\n", function);
   lua_getglobal(L, function);
   if (lua_isfunction(L, -1)) {
@@ -99,19 +99,19 @@ int function_exists(lua_State *L, const char *function) {
   }
 }
 
-void bb_write_rgb(int red, int green, int blue, int type) {
+void write_rgb_color(int red, int green, int blue, int type) {
   char buf[32];
   int n = snprintf(buf, 32, "\033[%d;2;%d;%d;%dm", type, red, green, blue);
-  bb_write2(buf, n);
+  buf_write2(buf, n);
 }
 
 // TODO: Interpolate into rgb colors
 // TODO: Change from a function to static data
-void bb_write_indexed(int idx, int type) {
+void write_indexed_color(int idx, int type) {
   static int has_interpolation_function = -1;
   if (has_interpolation_function == -1) {
     has_interpolation_function =
-        function_exists(neotmux->lua, "interpolate_color");
+        has_lua_function(neotmux->lua, "interpolate_color");
   } else if (has_interpolation_function) {
     lua_getglobal(neotmux->lua, "interpolate_color");
     lua_pushinteger(neotmux->lua, idx);
@@ -125,58 +125,58 @@ void bb_write_indexed(int idx, int type) {
     lua_pop(neotmux->lua, 4);
 
     if (use) {
-      bb_write_rgb(red, green, blue, type);
+      write_rgb_color(red, green, blue, type);
       return;
     }
   }
 
   char buf[32];
   int n = snprintf(buf, 32, "\033[%d;5;%dm", type, idx);
-  bb_write2(buf, n);
+  buf_write2(buf, n);
 }
 
 void render_cell(VTermScreenCell cell) {
   if (cell.attrs.bold != neotmux->prevCell.attrs.bold) {
     if (cell.attrs.bold) {
-      bb_write2("\033[1m", 4); // Enable bold
+      buf_write2("\033[1m", 4); // Enable bold
     } else {
-      bb_write2("\033[22m", 5); // Disable bold
+      buf_write2("\033[22m", 5); // Disable bold
     }
     neotmux->prevCell.attrs.bold = cell.attrs.bold;
   }
 
   if (cell.attrs.reverse != neotmux->prevCell.attrs.reverse) {
     if (cell.attrs.reverse) {
-      bb_write2("\033[7m", 4); // Enable reverse
+      buf_write2("\033[7m", 4); // Enable reverse
     } else {
-      bb_write2("\033[27m", 5); // Disable reverse
+      buf_write2("\033[27m", 5); // Disable reverse
     }
     neotmux->prevCell.attrs.reverse = cell.attrs.reverse;
   }
 
   if (cell.attrs.underline != neotmux->prevCell.attrs.underline) {
     if (cell.attrs.underline) {
-      bb_write2("\033[4m", 4); // Enable underline
+      buf_write2("\033[4m", 4); // Enable underline
     } else {
-      bb_write2("\033[24m", 5); // Disable underline
+      buf_write2("\033[24m", 5); // Disable underline
     }
     neotmux->prevCell.attrs.underline = cell.attrs.underline;
   }
 
   if (cell.attrs.italic != neotmux->prevCell.attrs.italic) {
     if (cell.attrs.italic) {
-      bb_write2("\033[3m", 4); // Enable italic
+      buf_write2("\033[3m", 4); // Enable italic
     } else {
-      bb_write2("\033[23m", 5); // Disable italic
+      buf_write2("\033[23m", 5); // Disable italic
     }
     neotmux->prevCell.attrs.italic = cell.attrs.italic;
   }
 
   if (cell.attrs.strike != neotmux->prevCell.attrs.strike) {
     if (cell.attrs.strike) {
-      bb_write2("\033[9m", 4); // Enable strike
+      buf_write2("\033[9m", 4); // Enable strike
     } else {
-      bb_write2("\033[29m", 5); // Disable strike
+      buf_write2("\033[29m", 5); // Disable strike
     }
     neotmux->prevCell.attrs.strike = cell.attrs.strike;
   }
@@ -184,31 +184,31 @@ void render_cell(VTermScreenCell cell) {
   if (!compare_colors(cell.bg, neotmux->prevCell.bg)) {
     if (cell.bg.type == VTERM_COLOR_DEFAULT_BG) {
     } else if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
-      bb_write_indexed(cell.bg.indexed.idx, 48);
+      write_indexed_color(cell.bg.indexed.idx, 48);
       neotmux->prevCell.bg = cell.bg;
     } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
-      bb_write_rgb(cell.bg.rgb.red, cell.bg.rgb.green, cell.bg.rgb.blue, 48);
+      write_rgb_color(cell.bg.rgb.red, cell.bg.rgb.green, cell.bg.rgb.blue, 48);
       neotmux->prevCell.bg = cell.bg;
     }
   }
 
   if (!compare_colors(cell.fg, neotmux->prevCell.fg)) {
     if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
-      bb_write_indexed(cell.fg.indexed.idx, 38);
+      write_indexed_color(cell.fg.indexed.idx, 38);
     } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
-      bb_write_rgb(cell.fg.rgb.red, cell.fg.rgb.green, cell.fg.rgb.blue, 38);
+      write_rgb_color(cell.fg.rgb.red, cell.fg.rgb.green, cell.fg.rgb.blue, 38);
     }
     neotmux->prevCell.fg = cell.fg;
   }
 
   if (cell.chars[0] == 0) {
-    bb_write2(" ", 1);
+    buf_write2(" ", 1);
   } else {
     for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i]; i++) {
       char bytes[6];
       int len = fill_utf8(cell.chars[i], bytes);
       bytes[len] = 0;
-      bb_write2(bytes, len);
+      buf_write2(bytes, len);
     }
   }
 }

@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-bool exec_file(lua_State *L, const char *filename) {
+bool execute_lua_file(lua_State *L, const char *filename) {
   if (access(filename, F_OK) == -1) {
     fprintf(stderr, "File does not exist: %s\n", filename);
     return true;
@@ -46,7 +46,7 @@ void load_plugins(lua_State *lua) {
       printf("Loading plugin: %s\n", entry->d_name);
       char path[PATH_MAX];
       snprintf(path, PATH_MAX, "%s/%s/init.lua", plugins, entry->d_name);
-      exec_file(lua, path);
+      execute_lua_file(lua, path);
     }
   }
 

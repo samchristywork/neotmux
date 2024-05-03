@@ -27,9 +27,9 @@ int main(int argc, char *argv[]) {
   }
 
   if (strcmp(argv[1], "server") == 0) {
-    return server(port);
+    return start_server(port);
   } else if (strcmp(argv[1], "client") == 0) {
-    return client(port);
+    return start_client(port);
   } else {
     usage(argv[0]);
     return EXIT_FAILURE;
