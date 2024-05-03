@@ -120,12 +120,6 @@ void bb_write_indexed(int idx, int type) {
   bb_write(buf, n);
 }
 
-void bb_write_rgb(int red, int green, int blue, int type) {
-  char buf[32];
-  int n = snprintf(buf, 32, "\033[%d;2;%d;%d;%dm", type, red, green, blue);
-  bb_write(buf, n);
-}
-
 void render_cell(VTermScreenCell cell) {
   if (cell.attrs.bold != prevCell.attrs.bold) {
     if (cell.attrs.bold) {
@@ -181,7 +175,6 @@ void render_cell(VTermScreenCell cell) {
       bb_write_rgb(cell.bg.rgb.red, cell.bg.rgb.green, cell.bg.rgb.blue, 48);
       prevCell.bg = cell.bg;
     }
-    bg = cell.bg;
   }
 
   if (!compare_colors(cell.fg, prevCell.fg)) {
@@ -217,54 +210,18 @@ void bb_color(int color) {
   bb_write(buf, n);
 }
 
-char *write_command(int *len, char *command) {
-  FILE *fp = popen(command, "r");
-  if (fp == NULL) {
-    return NULL;
-  }
-
-  char *ret = malloc(100);
-  int n = fread(ret, 1, 100, fp);
-  for (int i = 0; i < n; i++) {
-    if (ret[i] == '\n') {
-      ret[i] = 0;
-      n = i;
-      break;
+int physical_width(char *str) {
+  int width = 0;
+  for (int i = 0; str[i]; i++) {
+    if (str[i] == '\033') {
+      while (str[i] && str[i] != 'm') {
+        i++;
+      }
+    } else {
+      width++;
     }
   }
-  *len = n;
-  pclose(fp);
-  return ret;
-}
-
-void status_bar_new(int cols, int row) {
-  bb_pos(row, 1);
-  bb_write("\033[7m", 4); // Invert colors
-  bb_color(2);
-
-  int l, m, r;
-  char *left = write_command(&l, "date");
-  char *mid = write_command(&m, "hostname");
-  char *right = write_command(&r, "pwd");
-
-  int remaining = cols - l - m - r;
-
-  bb_write(left, strlen(left));
-  for (int i = 0; i < remaining; i++) {
-    bb_write(" ", 1);
-    remaining--;
-  }
-  bb_write(mid, strlen(mid));
-  for (int i = 0; i < remaining; i++) {
-    bb_write(" ", 1);
-  }
-  bb_write(right, strlen(right));
-
-  free(left);
-  free(mid);
-  free(right);
-
-  clear_style();
+  return width;
 }
 
 // TODO: Handle overflow condition
@@ -318,7 +275,7 @@ void status_bar(int cols, int row) {
   if (statusRight == NULL) {
     statusRight = strdup("");
   }
-  width += strlen(statusRight);
+  width += physical_width(statusRight);
 
   char padding[cols - width];
   memset(padding, ' ', cols - width);
@@ -422,6 +379,10 @@ void render_screen(int fd, int rows, int cols) {
     bb.capacity = 100;
   }
 
+  // This may fix weird artifacts in E.g. `man ls`
+  // TODO: Potential performance improvement
+  bzero(bb.buffer, bb.capacity);
+
   bb.n = 0;
 
   bb_write("\033[H", 3); // Move cursor to top left
@@ -433,6 +394,9 @@ void render_screen(int fd, int rows, int cols) {
     clear_style();
     for (int col = 0; col < cols; col++) {
       bool isRendered = false;
+      Session *currentSession = &neotmux->sessions[neotmux->current_session];
+      Window *currentWindow =
+          &currentSession->windows[currentSession->current_window];
       for (int k = 0; k < currentWindow->pane_count; k++) {
         if (currentWindow->zoom != -1 && k != currentWindow->zoom) {
           continue;
@@ -461,7 +425,14 @@ void render_screen(int fd, int rows, int cols) {
         clear_style();
 
         if (borders_active_pane(row, col, currentWindow)) {
-          bb_color(2);
+          static int border_color = -1;
+          if (border_color == -1) {
+            border_color = get_global_int(neotmux->lua, "border_color");
+            if (border_color == 0) {
+              border_color = 4;
+            }
+          }
+          bb_color(border_color);
           write_border_character(row, col, currentWindow);
           bb_write("\033[0m", 4);
         } else {
@@ -483,8 +454,6 @@ void render_screen(int fd, int rows, int cols) {
   }
 
   info_bar(rows + 2);
-
-  Pane *current_pane = &currentWindow->panes[currentWindow->current_pane];
 
   {
     VTermPos cursorPos;
