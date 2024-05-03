@@ -1,13 +1,18 @@
+#include <lua5.4/lauxlib.h>
+#include <lua5.4/lua.h>
+#include <lua5.4/lualib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 
+#include "lua.h"
 #include "session.h"
 
 extern Neotmux *neotmux;
 
-enum BarPosition { BAR_TOP, BAR_BOTTOM };
+enum BarPosition { BAR_NONE, BAR_TOP, BAR_BOTTOM };
+int barPos = BAR_NONE;
 
 VTermScreenCell prevCell = {0};
 
@@ -271,7 +276,14 @@ void status_bar(int cols, int row) {
   Window *current_window = &session->windows[session->current_window];
 
   bb_write("\033[7m", 4); // Invert colors
-  bb_color(2);
+  static int bar_color = -1;
+  if (bar_color == -1) {
+    bar_color = get_global_int(neotmux->lua, "bar_color");
+    if (bar_color == 0) {
+      bar_color = 4;
+    }
+  }
+  bb_color(bar_color);
 
   char *sessionName = session->title;
   bb_write("[", 1);
@@ -302,22 +314,10 @@ void status_bar(int cols, int row) {
     }
   }
 
-  char hostname[50];
-  gethostname(hostname, 50);
-
-  time_t t = time(NULL);
-  struct tm *tm = localtime(&t);
-  int hour = tm->tm_hour;
-  int minute = tm->tm_min;
-  int day = tm->tm_mday;
-  static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-  const char *month = months[tm->tm_mon];
-  int year = tm->tm_year + 1900;
-
-  char statusRight[100];
-  snprintf(statusRight, 100, "\"%s\" %d:%02d %d-%s-%d", hostname, hour, minute,
-           day, month, year);
+  char *statusRight = function_to_string(neotmux->lua, "status_right");
+  if (statusRight == NULL) {
+    statusRight = strdup("");
+  }
   width += strlen(statusRight);
 
   char padding[cols - width];
@@ -326,6 +326,7 @@ void status_bar(int cols, int row) {
   bb_write(padding, cols - width);
   bb_write(statusRight, strlen(statusRight));
   bb_write("\033[0m", 4);
+  free(statusRight);
 }
 
 void clear_style() {
@@ -395,14 +396,27 @@ void write_border_character(int row, int col, Window *window) {
 void info_bar(int row) {
   bb_pos(row, 1);
   bb_write("\033[2K", 4); // Clear line
-  static int numRenders = 0;
-  char buf[100];
-  int n = snprintf(buf, 100, "Rendered %d times", numRenders);
-  bb_write(buf, n);
-  numRenders++;
+  char *result = function_to_string(neotmux->lua, "neotmux_info");
+  if (result != NULL) {
+    bb_write(result, strlen(result));
+    free(result);
+  }
 }
 
 void render_screen(int fd, int rows, int cols) {
+  if (barPos == BAR_NONE) {
+    barPos = BAR_BOTTOM;
+    char *bp = get_global_string(neotmux->lua, "bar_position");
+    if (bp != NULL) {
+      if (strcmp(bp, "top") == 0) {
+        barPos = BAR_TOP;
+      } else if (strcmp(bp, "bottom") == 0) {
+        barPos = BAR_BOTTOM;
+      }
+      free(bp);
+    }
+  }
+
   if (bb.buffer == NULL) {
     bb.buffer = malloc(100);
     bb.capacity = 100;
@@ -414,10 +428,6 @@ void render_screen(int fd, int rows, int cols) {
   if (barPos == BAR_TOP) {
     bb_write("\r\n", 2);
   }
-
-  Session *session = &neotmux->sessions[neotmux->current_session];
-  Window *currentWindow = &session->windows[session->current_window];
-  Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
 
   for (int row = 0; row < rows; row++) {
     clear_style();
