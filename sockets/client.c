@@ -16,12 +16,21 @@ struct termios term;
 enum Mode { MODE_NORMAL, MODE_CONTROL, MODE_CONTROL_STICKY };
 fd_set fds;
 
+// Write a u32 representing the size of the message followed by the message
+ssize_t message(int sock, char *buf, size_t len) {
+  uint32_t size = len;
+  if (write(sock, &size, sizeof(uint32_t)) != sizeof(uint32_t)) {
+    return -1;
+  }
+  return write(sock, buf, len);
+}
+
 int ctrl_c_socket;
 void ctrl_c_callback(int sig) {
   char buf[2];
   buf[0] = 'e';
   buf[1] = 3;
-  write(ctrl_c_socket, buf, 2);
+  message(ctrl_c_socket, buf, 2);
 
   signal(sig, ctrl_c_callback);
 }
@@ -89,7 +98,7 @@ void receive_message(int sock) {
 
 void handle_key(int numRead, char *buf, int sock, char *str, char c) {
   if (numRead == 1 && buf[1] == c) {
-    write(sock, str, strlen(str));
+    message(sock, str, strlen(str));
   }
 }
 
@@ -111,8 +120,11 @@ void event_loop(int sock) {
     if (mode == MODE_NORMAL) {
       if (numRead == 1 && buf[1] == 1) { // Ctrl-A
         mode = MODE_CONTROL;
+      } else if (numRead == 1 && buf[1] == 10) { // Enter
+        buf[1] = 13; // Change newline to carriage return
+        message(sock, buf, numRead + 1);
       } else {
-        write(sock, buf, numRead + 1);
+        message(sock, buf, numRead + 1);
       }
     } else if (mode == MODE_CONTROL || mode == MODE_CONTROL_STICKY) {
       // TODO: Change to lua
@@ -136,15 +148,29 @@ void event_loop(int sock) {
       handle_key(numRead, buf, sock, "cNext", 'n');
       handle_key(numRead, buf, sock, "cPrev", 'p');
 
+      // Page up and down
+      if (numRead == 4 && buf[1] == 27 && buf[2] == 91 && buf[3] == 53 &&
+          buf[4] == 126) {
+        message(sock, "cScrollUp", 9);
+      } else if (numRead == 4 && buf[1] == 27 && buf[2] == 91 && buf[3] == 54 &&
+                 buf[4] == 126) {
+        message(sock, "cScrollDown", 11);
+      }
+
       // Arrow keys
       if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 68) {
-        write(sock, "cLeft", 5);
+        message(sock, "cLeft", 5);
       } else if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 67) {
-        write(sock, "cRight", 6);
+        message(sock, "cRight", 6);
       } else if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 65) {
-        write(sock, "cUp", 3);
+        message(sock, "cUp", 3);
       } else if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 66) {
-        write(sock, "cDown", 5);
+        message(sock, "cDown", 5);
+      }
+
+      // TODO: Get alt keys working
+      if (numRead == 2 && buf[0] == 27 && buf[1] == 'l') {
+        message(sock, "cRight", 5);
       }
 
       // Rename window
@@ -161,7 +187,7 @@ void event_loop(int sock) {
         char *input = readline("Rename Window: ");
         char buf[32];
         sprintf(buf, "cRenameWindow %s", input);
-        write(sock, buf, strlen(buf));
+        message(sock, buf, strlen(buf));
         raw_mode();
       }
 
@@ -179,7 +205,7 @@ void event_loop(int sock) {
         char *input = readline("Rename Session: ");
         char buf[32];
         sprintf(buf, "cRenameSession %s", input);
-        write(sock, buf, strlen(buf));
+        message(sock, buf, strlen(buf));
         raw_mode();
       }
 
@@ -227,7 +253,7 @@ void send_size(int sock) {
   buf[0] = 's';
   memcpy(buf + 1, &width, sizeof(uint32_t));
   memcpy(buf + 5, &height, sizeof(uint32_t));
-  write(sock, buf, 9);
+  message(sock, buf, 9);
 }
 
 int resize_socket;
