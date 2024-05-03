@@ -138,7 +138,7 @@ void event_loop(int sock) {
       handle_key(numRead, buf, sock, "cSplit", '"');
       handle_key(numRead, buf, sock, "cVSplit", '%');
       handle_key(numRead, buf, sock, "cList", 'i');
-      handle_key(numRead, buf, sock, "cCreate", 'c');
+      handle_key(numRead, buf, sock, "cCreate", 'e');
       handle_key(numRead, buf, sock, "cReload", 'r');
       handle_key(numRead, buf, sock, "cLeft", 'h');
       handle_key(numRead, buf, sock, "cDown", 'j');
@@ -176,6 +176,25 @@ void event_loop(int sock) {
       // TODO: Get alt keys working
       if (numRead == 2 && buf[0] == 27 && buf[1] == 'l') {
         message(sock, "cRight", 5);
+      }
+
+      // Create window
+      if (numRead == 1 && buf[1] == 'c') {
+        reset_mode();
+        struct winsize ws;
+        ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+        uint32_t width = ws.ws_col;
+        uint32_t height = ws.ws_row;
+
+        printf("\033[%d;1H", height);
+        printf("\033[K");
+
+        char *input = readline("Name of New Window: ");
+        char buf[32];
+        sprintf(buf, "cRenameWindow %s", input);
+        message(sock, "cCreate", 7);
+        message(sock, buf, strlen(buf));
+        raw_mode();
       }
 
       // Rename window
