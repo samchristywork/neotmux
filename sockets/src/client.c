@@ -37,12 +37,12 @@ void ctrl_c_callback(int sig) {
 
 void enable_mouse_tracking() {
   write(STDOUT_FILENO, "\033[?1003h", 8); // Mouse tracking
-  //write(STDOUT_FILENO, "\033[?1006h", 8); // Extended mouse tracking
+  // write(STDOUT_FILENO, "\033[?1006h", 8); // Extended mouse tracking
 }
 
 void disable_mouse_tracking() {
   write(STDOUT_FILENO, "\033[?1003l", 8); // Mouse tracking
-  //write(STDOUT_FILENO, "\033[?1006l", 8); // Extended mouse tracking
+  // write(STDOUT_FILENO, "\033[?1006l", 8); // Extended mouse tracking
 }
 
 void raw_mode() {
@@ -101,9 +101,11 @@ bool receive_message(int sock) {
   return true;
 }
 
-void handle_key(int numRead, char *buf, int sock, char *str, char c) {
-  if (numRead == 1 && buf[1] == c) {
-    message(sock, str, strlen(str));
+void handle_binding(int numRead, char *buf, int sock, char *command,
+                    char *binding) {
+  if (numRead == strlen(binding) &&
+      strncmp(buf + 1, binding, strlen(binding)) == 0) {
+    message(sock, command, strlen(command));
   }
 }
 
@@ -117,69 +119,60 @@ void event_loop(int sock) {
   char buf[32];
   buf[0] = 'e';
   while (1) {
-    ssize_t numRead = read(STDIN_FILENO, buf + 1, 6);
-    if (numRead <= 0) {
+    ssize_t n = read(STDIN_FILENO, buf + 1, 6);
+    if (n <= 0) {
       exit(EXIT_SUCCESS);
     }
 
     if (mode == MODE_NORMAL) {
-      if (numRead == 1 && buf[1] == 1) { // Ctrl-A
+      // Alt+hjkl
+      if (n == 2 && buf[1] == 27 && buf[2] == 'h') {
+        message(sock, "cLeft", 5);
+      } else if (n == 2 && buf[1] == 27 && buf[2] == 'l') {
+        message(sock, "cRight", 6);
+      } else if (n == 2 && buf[1] == 27 && buf[2] == 'j') {
+        message(sock, "cUp", 3);
+      } else if (n == 2 && buf[1] == 27 && buf[2] == 'k') {
+        message(sock, "cDown", 5);
+      } else if (n == 1 && buf[1] == 1) { // Ctrl-A
         mode = MODE_CONTROL;
-      } else if (numRead == 1 && buf[1] == 10) { // Enter
-        buf[1] = 13; // Change newline to carriage return
-        message(sock, buf, numRead + 1);
+      } else if (n == 1 && buf[1] == 10) { // Enter
+        buf[1] = 13;                       // Change newline to carriage return
+        message(sock, buf, n + 1);
       } else {
-        message(sock, buf, numRead + 1);
+        message(sock, buf, n + 1);
       }
     } else if (mode == MODE_CONTROL || mode == MODE_CONTROL_STICKY) {
       // TODO: Change to lua
-      handle_key(numRead, buf, sock, "cSplit", '|');
-      handle_key(numRead, buf, sock, "cVSplit", '_');
-      handle_key(numRead, buf, sock, "cSplit", '"');
-      handle_key(numRead, buf, sock, "cVSplit", '%');
-      handle_key(numRead, buf, sock, "cList", 'i');
-      handle_key(numRead, buf, sock, "cCreate", 'e');
-      handle_key(numRead, buf, sock, "cReload", 'r');
-      handle_key(numRead, buf, sock, "cLeft", 'h');
-      handle_key(numRead, buf, sock, "cDown", 'j');
-      handle_key(numRead, buf, sock, "cUp", 'k');
-      handle_key(numRead, buf, sock, "cRight", 'l');
-      handle_key(numRead, buf, sock, "cZoom", 'z');
-      handle_key(numRead, buf, sock, "cEven_Horizontal", '1');
-      handle_key(numRead, buf, sock, "cEven_Vertical", '2');
-      handle_key(numRead, buf, sock, "cMain_Horizontal", '3');
-      handle_key(numRead, buf, sock, "cMain_Vertical", '4');
-      handle_key(numRead, buf, sock, "cTiled", '5');
-      handle_key(numRead, buf, sock, "cNext", 'n');
-      handle_key(numRead, buf, sock, "cPrev", 'p');
-
-      // Page up and down
-      if (numRead == 4 && buf[1] == 27 && buf[2] == 91 && buf[3] == 53 &&
-          buf[4] == 126) {
-        message(sock, "cScrollUp", 9);
-      } else if (numRead == 4 && buf[1] == 27 && buf[2] == 91 && buf[3] == 54 &&
-                 buf[4] == 126) {
-        message(sock, "cScrollDown", 11);
-      }
-
-      // Arrow keys
-      if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 68) {
-        message(sock, "cLeft", 5);
-      } else if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 67) {
-        message(sock, "cRight", 6);
-      } else if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 65) {
-        message(sock, "cUp", 3);
-      } else if (numRead == 3 && buf[1] == 27 && buf[2] == 91 && buf[3] == 66) {
-        message(sock, "cDown", 5);
-      }
-
-      // TODO: Get alt keys working
-      if (numRead == 2 && buf[0] == 27 && buf[1] == 'l') {
-        message(sock, "cRight", 5);
-      }
+      handle_binding(n, buf, sock, "cSplit", "|");
+      handle_binding(n, buf, sock, "cVSplit", "_");
+      handle_binding(n, buf, sock, "cSplit", "\"");
+      handle_binding(n, buf, sock, "cVSplit", "%");
+      handle_binding(n, buf, sock, "cList", "i");
+      handle_binding(n, buf, sock, "cCreate", "e");
+      handle_binding(n, buf, sock, "cReload", "r");
+      handle_binding(n, buf, sock, "cLeft", "h");
+      handle_binding(n, buf, sock, "cDown", "j");
+      handle_binding(n, buf, sock, "cUp", "k");
+      handle_binding(n, buf, sock, "cRight", "l");
+      handle_binding(n, buf, sock, "cZoom", "z");
+      handle_binding(n, buf, sock, "cEven_Horizontal", "1");
+      handle_binding(n, buf, sock, "cEven_Vertical", "2");
+      handle_binding(n, buf, sock, "cMain_Horizontal", "3");
+      handle_binding(n, buf, sock, "cMain_Vertical", "4");
+      handle_binding(n, buf, sock, "cTiled", "5");
+      handle_binding(n, buf, sock, "cCustom", "6");
+      handle_binding(n, buf, sock, "cNext", "n");
+      handle_binding(n, buf, sock, "cPrev", "p");
+      handle_binding(n, buf, sock, "cScrollUp", "\033[5~");   // Page up
+      handle_binding(n, buf, sock, "cScrollDown", "\033[6~"); // Page down
+      handle_binding(n, buf, sock, "cLeft", "\033[D");        // Left
+      handle_binding(n, buf, sock, "cRight", "\033[C");       // Right
+      handle_binding(n, buf, sock, "cUp", "\033[A");          // Up
+      handle_binding(n, buf, sock, "cDown", "\033[B");        // Down
 
       // Create window
-      if (numRead == 1 && buf[1] == 'c') {
+      if (n == 1 && buf[1] == 'c') {
         reset_mode();
         struct winsize ws;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
@@ -198,7 +191,7 @@ void event_loop(int sock) {
       }
 
       // Rename window
-      if (numRead == 1 && buf[1] == ',') {
+      if (n == 1 && buf[1] == ',') {
         reset_mode();
         struct winsize ws;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
@@ -216,7 +209,7 @@ void event_loop(int sock) {
       }
 
       // Rename session
-      if (numRead == 1 && buf[1] == '$') {
+      if (n == 1 && buf[1] == '$') {
         reset_mode();
         struct winsize ws;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
@@ -233,24 +226,24 @@ void event_loop(int sock) {
         raw_mode();
       }
 
-      if (numRead == 1 && buf[1] == 'n') {
+      if (n == 1 && buf[1] == 'n') {
         send_size(sock);
       }
 
-      if (numRead == 1 && buf[1] == 'p') {
+      if (n == 1 && buf[1] == 'p') {
         send_size(sock);
       }
 
-      if (numRead == 1 && buf[1] == 's') {
+      if (n == 1 && buf[1] == 's') {
         mode = MODE_CONTROL_STICKY;
       }
 
-      if (numRead == 1 && buf[1] == 'q') {
+      if (n == 1 && buf[1] == 'q') {
         break;
       }
 
       if (mode == MODE_CONTROL_STICKY) {
-        if (numRead == 1 && buf[1] == 1) { // Ctrl-A
+        if (n == 1 && buf[1] == 1) { // Ctrl-A
           mode = MODE_NORMAL;
         }
       }

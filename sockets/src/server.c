@@ -18,12 +18,66 @@
 
 #include "layout.h"
 #include "lua.h"
+#include "move.h"
+#include "print_session.h"
 #include "pty.h"
 #include "render.h"
 #include "session.h"
 
 bool dirty = true; // TODO: Dirty should be on a per-pane basis
 Neotmux *neotmux;
+
+Pane *add_pane(Window *window, int col, int row, int width, int height) {
+  int n = sizeof(*window->panes) * (window->pane_count + 1);
+  window->panes = realloc(window->panes, n);
+  Pane *pane = &window->panes[window->pane_count];
+  pane->col = col;
+  pane->row = row;
+  pane->width = width;
+  pane->height = height;
+  pane->process.pid = -1;
+  pane->process.name = NULL;
+  pane->process.fd = -1;
+  pane->process.closed = false;
+  pane->process.cursor_visible = true;
+  pane->process.mouse = VTERM_PROP_MOUSE_NONE;
+  window->pane_count++;
+  return pane;
+}
+
+Window *add_window(Session *session, char *title) {
+  int n = sizeof(*session->windows) * (session->window_count + 1);
+  session->windows = realloc(session->windows, n);
+  Window *window = &session->windows[session->window_count];
+  window->title = malloc(strlen(title) + 1);
+  strcpy(window->title, title);
+  window->pane_count = 0;
+  window->current_pane = 0;
+  window->panes = NULL;
+  window->layout = LAYOUT_MAIN_VERTICAL;
+  window->width = 80;
+  window->height = 24;
+  window->zoom = -1;
+  session->window_count++;
+  return window;
+}
+
+Session *add_session(Neotmux *neotmux, char *title) {
+  if (neotmux->sessions == NULL) {
+    neotmux->sessions = malloc(sizeof(*neotmux->sessions));
+  } else {
+    int n = sizeof(*neotmux->sessions) * (neotmux->session_count + 1);
+    neotmux->sessions = realloc(neotmux->sessions, n);
+  }
+  Session *session = &neotmux->sessions[neotmux->session_count];
+  session->title = malloc(strlen(title) + 1);
+  strcpy(session->title, title);
+  session->window_count = 0;
+  session->current_window = 0;
+  session->windows = NULL;
+  neotmux->session_count++;
+  return session;
+}
 
 // Read a u32 representing the size of the message followed by the message
 ssize_t receive(int sock, char *buf, size_t len) {
@@ -90,6 +144,28 @@ void init_screen(VTerm **vt, VTermScreen **vts, int h, int w, Pane *pane) {
   vterm_screen_reset(*vts, 1);
   vterm_screen_enable_altscreen(*vts, 1);
   vterm_screen_set_callbacks(*vts, &callbacks, pane);
+}
+
+bool get_global_boolean(lua_State *L, const char *name) {
+  lua_getglobal(L, name);
+  if (!lua_isboolean(L, -1)) {
+    lua_pop(L, 1);
+    return false;
+  }
+  bool result = lua_toboolean(L, -1);
+  lua_pop(L, 1);
+  return result;
+}
+
+char *get_global_string(lua_State *L, const char *name) {
+  lua_getglobal(L, name);
+  if (!lua_isstring(L, -1)) {
+    lua_pop(L, 1);
+    return NULL;
+  }
+  char *result = strdup(lua_tostring(L, -1));
+  lua_pop(L, 1);
+  return result;
 }
 
 void add_process_to_pane(Pane *pane) {
@@ -165,100 +241,9 @@ int accept_connection(int socket_desc, struct sockaddr_in client) {
   return socket;
 }
 
-bool within_rect(int x, int y, int x1, int y1, int w, int h) {
-  return x >= x1 && x < x1 + w && y >= y1 && y < y1 + h;
-}
-
-int left(Window *w) {
-  Pane *currentPane = &w->panes[w->current_pane];
-  int col = currentPane->col;
-  int row = currentPane->row;
-  col--;
-
-  while (true) {
-    if (col < 0) {
-      col = w->width - 1;
-    }
-    for (int r = row; r < row + currentPane->height; r++) {
-      for (int i = 0; i < w->pane_count; i++) {
-        Pane *pane = &w->panes[i];
-        if (within_rect(col, r, pane->col, pane->row, pane->width,
-                        pane->height)) {
-          return i;
-        }
-      }
-    }
-    col--;
-  }
-}
-
-int right(Window *w) {
-  Pane *currentPane = &w->panes[w->current_pane];
-  int col = currentPane->col;
-  int row = currentPane->row;
-  col += currentPane->width;
-
-  while (true) {
-    if (col >= w->width) {
-      col = 0;
-    }
-    for (int r = row; r < row + currentPane->height; r++) {
-      for (int i = 0; i < w->pane_count; i++) {
-        Pane *pane = &w->panes[i];
-        if (within_rect(col, r, pane->col, pane->row, pane->width,
-                        pane->height)) {
-          return i;
-        }
-      }
-    }
-    col++;
-  }
-}
-
-int up(Window *w) {
-  Pane *currentPane = &w->panes[w->current_pane];
-  int col = currentPane->col;
-  int row = currentPane->row;
-  row--;
-
-  while (true) {
-    if (row < 0) {
-      row = w->height - 1;
-    }
-    for (int c = col; c < col + currentPane->width; c++) {
-      for (int i = 0; i < w->pane_count; i++) {
-        Pane *pane = &w->panes[i];
-        if (within_rect(c, row, pane->col, pane->row, pane->width,
-                        pane->height)) {
-          return i;
-        }
-      }
-    }
-    row--;
-  }
-}
-
-int down(Window *w) {
-  Pane *currentPane = &w->panes[w->current_pane];
-  int col = currentPane->col;
-  int row = currentPane->row;
-  row += currentPane->height;
-
-  while (true) {
-    if (row >= w->height) {
-      row = 0;
-    }
-    for (int c = col; c < col + currentPane->width; c++) {
-      for (int i = 0; i < w->pane_count; i++) {
-        Pane *pane = &w->panes[i];
-        if (within_rect(c, row, pane->col, pane->row, pane->width,
-                        pane->height)) {
-          return i;
-        }
-      }
-    }
-    row++;
-  }
+bool within_rect(VTermRect rect, VTermPos pos) {
+  return pos.col >= rect.start_col && pos.col < rect.end_col &&
+         pos.row >= rect.start_row && pos.row < rect.end_row;
 }
 
 // TODO: Rework this code
@@ -320,7 +305,12 @@ bool handle_input(int socket, char *buf, int read_size) {
           printf("  %d, %d, %d, %d\n", w->panes[i].col, w->panes[i].row,
                  w->panes[i].width, w->panes[i].height);
           Pane *p = &w->panes[i];
-          if (within_rect(x - 1, y - 1, p->col, p->row, p->width, p->height)) {
+          VTermRect rect = {.start_col = p->col,
+                            .start_row = p->row,
+                            .end_col = p->col + p->width,
+                            .end_row = p->row + p->height};
+          VTermPos pos = {.col = x - 1, .row = y - 1};
+          if (within_rect(rect, pos)) {
             printf("Found pane %d\n", i);
             w->current_pane = i;
             calculate_layout(w);
@@ -418,16 +408,16 @@ bool handle_input(int socket, char *buf, int read_size) {
       calculate_layout(&session->windows[session->current_window]);
       dirty = true;
     } else if (strcmp(cmd, "Left") == 0) {
-      w->current_pane = left(w);
+      w->current_pane = direction(LEFT, w);
       dirty = true;
     } else if (strcmp(cmd, "Right") == 0) {
-      w->current_pane = right(w);
+      w->current_pane = direction(RIGHT, w);
       dirty = true;
     } else if (strcmp(cmd, "Up") == 0) {
-      w->current_pane = up(w);
+      w->current_pane = direction(UP, w);
       dirty = true;
     } else if (strcmp(cmd, "Down") == 0) {
-      w->current_pane = down(w);
+      w->current_pane = direction(DOWN, w);
       dirty = true;
     } else if (strcmp(cmd, "Even_Horizontal") == 0) {
       printf("Even Horizontal\n");
@@ -452,6 +442,11 @@ bool handle_input(int socket, char *buf, int read_size) {
     } else if (strcmp(cmd, "Tiled") == 0) {
       printf("Tiled\n");
       w->layout = LAYOUT_TILED;
+      calculate_layout(w);
+      dirty = true;
+    } else if (strcmp(cmd, "Custom") == 0) {
+      printf("Custom\n");
+      w->layout = LAYOUT_CUSTOM;
       calculate_layout(w);
       dirty = true;
     } else if (strcmp(cmd, "Zoom") == 0) {
@@ -555,6 +550,17 @@ void reorder_panes(Window *w) {
 }
 
 void *client_handler(void *socket_desc) {
+  static bool initialized = false;
+  if (!initialized) {
+    initialized = true;
+    Session *s = add_session(neotmux, "Main");
+    Window *w = add_window(s, "Main");
+    for (int i = 0; i < 3; i++) {
+      Pane *p = add_pane(w, 0, 0, w->width, w->height);
+      add_process_to_pane(p);
+    }
+  }
+
   int socket = *(int *)socket_desc;
   int frame = 0;
 
@@ -668,6 +674,8 @@ int server(int port) {
   neotmux->session_count = 0;
   neotmux->current_session = 0;
   neotmux->mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+  bzero(&neotmux->bb, sizeof(neotmux->bb));
+  bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));
   neotmux->lua = luaL_newstate();
   luaL_openlibs(neotmux->lua); // What does this do?
   char *lua = "print('Lua initialized')";
@@ -689,13 +697,6 @@ int server(int port) {
 
   if (!exec_file(neotmux->lua, "init.lua")) {
     return EXIT_FAILURE;
-  }
-
-  Session *s = add_session(neotmux, "Main");
-  Window *w = add_window(s, "Main");
-  for (int i = 0; i < 3; i++) {
-    Pane *p = add_pane(w, 0, 0, w->width, w->height);
-    add_process_to_pane(p);
   }
 
   signal(SIGINT, ctrl_c);

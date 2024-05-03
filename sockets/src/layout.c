@@ -2,6 +2,35 @@
 
 #include "layout.h"
 
+extern Neotmux *neotmux;
+
+// TODO: Change to lua
+
+bool layout_function(lua_State *L, const char *function, int *col, int *row,
+                     int *width, int *height, int index, int nPanes,
+                     int winWidth, int winHeight) {
+  lua_getglobal(L, function);
+  if (!lua_isfunction(L, -1)) {
+    lua_pop(L, 1);
+    return false;
+  }
+
+  lua_getglobal(L, function);
+  lua_pushinteger(L, index);
+  lua_pushinteger(L, nPanes);
+  lua_pushinteger(L, winWidth);
+  lua_pushinteger(L, winHeight);
+  lua_call(L, 4, 4);
+
+  *col = lua_tointeger(L, -4);
+  *row = lua_tointeger(L, -3);
+  *width = lua_tointeger(L, -2);
+  *height = lua_tointeger(L, -1);
+
+  lua_pop(L, 4);
+  return true;
+}
+
 void update_layout(Window *w) {
   for (int i = 0; i < w->pane_count; i++) {
     vterm_set_size(w->panes[i].process.vt, w->panes[i].height,
@@ -147,6 +176,24 @@ void tiled_layout(Window *w) {
   update_layout(w);
 }
 
+// TODO: Fix how borders work to make this look correct
+void custom_layout(Window *w) {
+  Pane *panes = w->panes;
+
+  for (int i = 0; i < w->pane_count; i++) {
+    int col, row, width, height;
+    if (layout_function(neotmux->lua, "layout_custom", &col, &row, &width,
+                        &height, i, w->pane_count, w->width, w->height)) {
+      panes[i].row = row;
+      panes[i].col = col;
+      panes[i].height = height;
+      panes[i].width = width;
+    }
+  }
+
+  update_layout(w);
+}
+
 void calculate_layout(Window *window) {
   if (window->zoom != -1) {
     window->panes[window->zoom].row = 0;
@@ -173,6 +220,9 @@ void calculate_layout(Window *window) {
       break;
     case LAYOUT_TILED:
       tiled_layout(window);
+      break;
+    case LAYOUT_CUSTOM:
+      custom_layout(window);
       break;
     default:
       break;
