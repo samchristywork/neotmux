@@ -72,7 +72,7 @@ int connect_to_server(int sock, struct sockaddr_in *server) {
   return 0;
 }
 
-void receive_message(int sock) {
+bool receive_message(int sock) {
   FD_ZERO(&fds);
   FD_SET(sock, &fds);
 
@@ -80,20 +80,25 @@ void receive_message(int sock) {
   int retval = select(sock + 1, &fds, NULL, NULL, NULL);
   if (retval == -1) {
     perror("select()");
+    return false;
   } else if (retval) {
     int read_size = recv(sock, server_reply, 2000, 0);
     if (read_size == 0) {
       puts("Server disconnected");
-      exit(EXIT_FAILURE);
+      return false;
     } else if (read_size == -1) {
       perror("recv failed");
-      exit(EXIT_FAILURE);
+      return false;
+    } else if (read_size == 1 && strncmp(server_reply, "e", 1) == 0) {
+      return false;
     }
     write(STDOUT_FILENO, server_reply, read_size);
     fflush(stdout);
   } else {
     puts("Timeout (This should not happen)");
+    return false;
   }
+  return true;
 }
 
 void handle_key(int numRead, char *buf, int sock, char *str, char c) {
@@ -268,9 +273,12 @@ void *receive_messages(void *socket_desc) {
   send_size(sock);
 
   while (1) {
-    receive_message(sock);
+    if (!receive_message(sock)) {
+      break;
+    }
   }
-  pthread_exit(NULL);
+  close(sock);
+  exit(EXIT_SUCCESS);
 }
 
 int client(int port) {
