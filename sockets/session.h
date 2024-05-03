@@ -1,6 +1,7 @@
 #ifndef SESSION_H
 #define SESSION_H
 
+#include <lua5.4/lua.h>
 #include <vterm.h>
 
 typedef enum Layout {
@@ -54,6 +55,8 @@ typedef struct Neotmux {
   Session *sessions;
   int session_count;
   int current_session;
+  pthread_mutex_t mutex;
+  lua_State *lua;
 } Neotmux;
 
 void print_sessions(Neotmux *neotmux);

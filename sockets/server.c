@@ -1,5 +1,8 @@
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <lua5.4/lauxlib.h>
+#include <lua5.4/lua.h>
+#include <lua5.4/lualib.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -517,12 +520,12 @@ void *client_handler(void *socket_desc) {
   int socket = *(int *)socket_desc;
   int frame = 0;
 
-  pthread_mutex_lock(&mutex);
+  pthread_mutex_lock(&neotmux->mutex);
   printf("Client connected (%d)\n", socket);
   Session *session = &neotmux->sessions[neotmux->current_session];
   Window *w = &session->windows[session->current_window];
   render_screen(socket, w->height, w->width);
-  pthread_mutex_unlock(&mutex);
+  pthread_mutex_unlock(&neotmux->mutex);
 
   while (1) {
     int sixty_fps = 1000000 / 60;
@@ -532,6 +535,7 @@ void *client_handler(void *socket_desc) {
     FD_SET(socket, &fds);
     int max_fd = socket;
 
+    pthread_mutex_lock(&neotmux->mutex);
     for (int i = 0; i < neotmux->session_count; i++) {
       Session *session = &neotmux->sessions[i];
       Window w = session[i].windows[session[i].current_window];
@@ -547,6 +551,7 @@ void *client_handler(void *socket_desc) {
         }
       }
     }
+    pthread_mutex_unlock(&neotmux->mutex);
 
     int retval = select(max_fd + 1, &fds, NULL, NULL, &tv);
     if (retval == -1) {
@@ -554,6 +559,7 @@ void *client_handler(void *socket_desc) {
       break;
     }
 
+    pthread_mutex_lock(&neotmux->mutex);
     for (int i = 0; i < neotmux->session_count; i++) {
       Session *session = &neotmux->sessions[i];
       Window *w = &session[i].windows[session[i].current_window];
@@ -582,7 +588,9 @@ void *client_handler(void *socket_desc) {
         }
       }
     }
+    pthread_mutex_unlock(&neotmux->mutex);
 
+    pthread_mutex_lock(&neotmux->mutex);
     if (retval && FD_ISSET(socket, &fds)) {
       char buf[32];
       int read_size = recv(socket, buf, 32, 0);
@@ -597,6 +605,7 @@ void *client_handler(void *socket_desc) {
         dirty = false;
       }
     }
+    pthread_mutex_unlock(&neotmux->mutex);
   }
 
   free(socket_desc);
@@ -608,11 +617,36 @@ int server(int port) {
   neotmux->sessions = NULL;
   neotmux->session_count = 0;
   neotmux->current_session = 0;
-  Session *s = add_session(neotmux, "Main Session");
-  Window *w = add_window(s, "Main Window");
-  Pane *p = add_pane(w, 0, 0, w->width, w->height);
-  add_process_to_pane(p);
-  print_sessions(neotmux);
+  neotmux->mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+  neotmux->lua = luaL_newstate();
+  luaL_openlibs(neotmux->lua); // What does this do?
+  char *lua = "print('Lua initialized')";
+  luaL_dostring(neotmux->lua, lua);
+
+  char *home = getenv("HOME");
+  char dotfile[PATH_MAX];
+  snprintf(dotfile, PATH_MAX, "%s/.ntmux.lua", home);
+
+  if (!exec_file(neotmux->lua, "default.lua")) {
+    return EXIT_FAILURE;
+  }
+
+  load_plugins(neotmux->lua);
+
+  if (!exec_file(neotmux->lua, dotfile)) {
+    return EXIT_FAILURE;
+  }
+
+  if (!exec_file(neotmux->lua, "init.lua")) {
+    return EXIT_FAILURE;
+  }
+
+  Session *s = add_session(neotmux, "Main");
+  Window *w = add_window(s, "Main");
+  for (int i = 0; i < 3; i++) {
+    Pane *p = add_pane(w, 0, 0, w->width, w->height);
+    add_process_to_pane(p);
+  }
 
   signal(SIGINT, ctrl_c);
 

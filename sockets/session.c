@@ -1,6 +1,8 @@
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "session.h"
 
@@ -48,6 +50,17 @@ void print_cursor_shape(int cursor_shape) {
     printf("Unknown");
     break;
   }
+
+  printf("\n");
+}
+
+void print_process_cwd(pid_t pid) {
+  char cwd[PATH_MAX] = {0};
+  char link[PATH_MAX] = {0};
+  sprintf(link, "/proc/%d/cwd", pid);
+  if (readlink(link, cwd, sizeof(cwd)) != -1) {
+    printf("        cwd: %s\n", cwd);
+  }
 }
 
 void print_process(Process *process) {
@@ -60,7 +73,7 @@ void print_process(Process *process) {
            process->cursor_visible ? "True" : "False");
     printf("        cursor_shape: ");
     print_cursor_shape(process->cursor_shape);
-    printf("\n");
+    print_process_cwd(process->pid);
   } else {
     printf("      Process: %s\n", "None");
   }
