@@ -457,39 +457,51 @@ void render_screen(int fd, int rows, int cols) {
 
   {
     VTermPos cursorPos;
-    VTermState *state = vterm_obtain_state(current_pane->process.vt);
-    vterm_state_get_cursorpos(state, &cursorPos);
-    cursorPos.row += currentPane->row;
-    cursorPos.col += currentPane->col;
+    Session *currentSession = &neotmux->sessions[neotmux->current_session];
+    Window *currentWindow =
+        &currentSession->windows[currentSession->current_window];
+    if (currentWindow->current_pane != -1) {
+      Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
+      VTermState *state = vterm_obtain_state(currentPane->process.vt);
+      vterm_state_get_cursorpos(state, &cursorPos);
+      cursorPos.row += currentPane->row;
+      cursorPos.col += currentPane->col;
 
-    if (barPos == BAR_TOP) {
-      cursorPos.row++;
+      if (barPos == BAR_TOP) {
+        cursorPos.row++;
+      }
+
+      bb_write("\033[", 2);
+      char buf[32];
+      int n = snprintf(buf, 32, "%d;%dH", cursorPos.row + 1, cursorPos.col + 1);
+      bb_write(buf, n);
+    }
+  }
+
+  Session *currentSession = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow =
+      &currentSession->windows[currentSession->current_window];
+  if (currentWindow->current_pane != -1) {
+    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
+    if (currentPane->process.cursor_visible) {
+      bb_write("\033[?25h", 6); // Show cursor
+    } else {
+      bb_write("\033[?25l", 6); // Hide cursor
     }
 
-    bb_write("\033[", 2);
-    char buf[32];
-    int n = snprintf(buf, 32, "%d;%dH", cursorPos.row + 1, cursorPos.col + 1);
-    bb_write(buf, n);
-  }
-
-  if (current_pane->process.cursor_visible) {
-    bb_write("\033[?25h", 6); // Show cursor
-  } else {
-    bb_write("\033[?25l", 6); // Hide cursor
-  }
-
-  switch (current_pane->process.cursor_shape) {
-  case VTERM_PROP_CURSORSHAPE_BLOCK:
-    bb_write("\033[0 q", 6); // Block cursor
-    break;
-  case VTERM_PROP_CURSORSHAPE_UNDERLINE:
-    bb_write("\033[3 q", 6); // Underline cursor
-    break;
-  case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
-    bb_write("\033[5 q", 6); // Vertical bar cursor
-    break;
-  default:
-    break;
+    switch (currentPane->process.cursor_shape) {
+    case VTERM_PROP_CURSORSHAPE_BLOCK:
+      bb_write("\033[0 q", 6); // Block cursor
+      break;
+    case VTERM_PROP_CURSORSHAPE_UNDERLINE:
+      bb_write("\033[3 q", 6); // Underline cursor
+      break;
+    case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
+      bb_write("\033[5 q", 6); // Vertical bar cursor
+      break;
+    default:
+      break;
+    }
   }
 
   write(fd, bb.buffer, bb.n);
