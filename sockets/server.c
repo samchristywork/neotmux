@@ -17,14 +17,23 @@
 #include <vterm.h>
 
 #include "layout.h"
+#include "lua.h"
 #include "pty.h"
 #include "render.h"
 #include "session.h"
 
 bool dirty = true; // TODO: Dirty should be on a per-pane basis
 Neotmux *neotmux;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-#define MAX_NAME 1024
+
+// Read a u32 representing the size of the message followed by the message
+ssize_t receive(int sock, char *buf, size_t len) {
+  // call_function(neotmux->lua, "helloWorld");
+  uint32_t size;
+  if (read(sock, &size, sizeof(uint32_t)) != sizeof(uint32_t)) {
+    return -1;
+  }
+  return read(sock, buf, size);
+}
 
 int ctrl_c_socket_desc;
 void ctrl_c(int sig) {
@@ -47,6 +56,17 @@ int term_prop_callback(VTermProp prop, VTermValue *val, void *user) {
   return 0;
 }
 
+int push_line_callback(int cols, const VTermScreenCell *cells, void *user) {
+  // TODO: Copy these lines into scrollback buffer
+  // Pane *pane = (Pane *)user;
+  // printf("Cols: %d\n", cols);
+  // for (int i = 0; i < cols; i++) {
+  //  printf("%c", cells[i].chars[0]);
+  //}
+  // printf("\n");
+  return 0;
+}
+
 void init_screen(VTerm **vt, VTermScreen **vts, int h, int w, Pane *pane) {
   *vt = vterm_new(h, w);
   if (!vt) {
@@ -63,8 +83,8 @@ void init_screen(VTerm **vt, VTermScreen **vts, int h, int w, Pane *pane) {
   callbacks.settermprop = term_prop_callback;
   callbacks.bell = NULL;
   callbacks.resize = NULL;
-  callbacks.sb_pushline = NULL;
-  callbacks.sb_popline = NULL;
+  callbacks.sb_pushline = push_line_callback; // TODO: Use for scrolling
+  callbacks.sb_popline = NULL;                // TODO: Use for scrolling
 
   vterm_set_utf8(*vt, 1);
   vterm_screen_reset(*vts, 1);
@@ -73,20 +93,37 @@ void init_screen(VTerm **vt, VTermScreen **vts, int h, int w, Pane *pane) {
 }
 
 void add_process_to_pane(Pane *pane) {
-  struct winsize ws;
+  bool keepDir = get_global_boolean(neotmux->lua, "keep_dir");
+  struct winsize ws = {0};
   ws.ws_col = pane->width;
   ws.ws_row = pane->height;
-  ws.ws_xpixel = 0;
-  ws.ws_ypixel = 0;
 
-  char childName[MAX_NAME];
-  pid_t childPid = pty_fork(&pane->process.fd, childName, MAX_NAME, &ws);
+  char childName[PATH_MAX];
+  pid_t childPid = pty_fork(&pane->process.fd, childName, PATH_MAX, &ws);
   if (childPid == -1) {
     exit(EXIT_FAILURE);
-  }
+  } else if (childPid == 0) { // Child
+    if (keepDir) {
+      Session *session = &neotmux->sessions[neotmux->current_session];
+      if (session->window_count > 0) {
+        Window *window = &session->windows[session->current_window];
+        if (window->pane_count > 0) {
+          Pane *pane = &window->panes[window->current_pane];
+          char cwd[PATH_MAX] = {0};
+          char link[PATH_MAX] = {0};
+          sprintf(link, "/proc/%d/cwd", pane->process.pid);
+          if (readlink(link, cwd, sizeof(cwd)) != -1) {
+            chdir(cwd);
+          }
+        }
+      }
+    }
 
-  if (childPid == 0) { // Child
-    char *shell = getenv("SHELL");
+    char *shell = get_global_string(neotmux->lua, "shell");
+    if (!shell) {
+      shell = getenv("SHELL");
+    }
+
     execlp(shell, shell, (char *)NULL);
     exit(EXIT_FAILURE);
   }
@@ -142,11 +179,13 @@ int left(Window *w) {
     if (col < 0) {
       col = w->width - 1;
     }
-    for (int i = 0; i < w->pane_count; i++) {
-      Pane *pane = &w->panes[i];
-      if (within_rect(col, row, pane->col, pane->row, pane->width,
-                      pane->height)) {
-        return i;
+    for (int r = row; r < row + currentPane->height; r++) {
+      for (int i = 0; i < w->pane_count; i++) {
+        Pane *pane = &w->panes[i];
+        if (within_rect(col, r, pane->col, pane->row, pane->width,
+                        pane->height)) {
+          return i;
+        }
       }
     }
     col--;
@@ -163,11 +202,13 @@ int right(Window *w) {
     if (col >= w->width) {
       col = 0;
     }
-    for (int i = 0; i < w->pane_count; i++) {
-      Pane *pane = &w->panes[i];
-      if (within_rect(col, row, pane->col, pane->row, pane->width,
-                      pane->height)) {
-        return i;
+    for (int r = row; r < row + currentPane->height; r++) {
+      for (int i = 0; i < w->pane_count; i++) {
+        Pane *pane = &w->panes[i];
+        if (within_rect(col, r, pane->col, pane->row, pane->width,
+                        pane->height)) {
+          return i;
+        }
       }
     }
     col++;
@@ -184,11 +225,13 @@ int up(Window *w) {
     if (row < 0) {
       row = w->height - 1;
     }
-    for (int i = 0; i < w->pane_count; i++) {
-      Pane *pane = &w->panes[i];
-      if (within_rect(col, row, pane->col, pane->row, pane->width,
-                      pane->height)) {
-        return i;
+    for (int c = col; c < col + currentPane->width; c++) {
+      for (int i = 0; i < w->pane_count; i++) {
+        Pane *pane = &w->panes[i];
+        if (within_rect(c, row, pane->col, pane->row, pane->width,
+                        pane->height)) {
+          return i;
+        }
       }
     }
     row--;
@@ -205,70 +248,17 @@ int down(Window *w) {
     if (row >= w->height) {
       row = 0;
     }
-    for (int i = 0; i < w->pane_count; i++) {
-      Pane *pane = &w->panes[i];
-      if (within_rect(col, row, pane->col, pane->row, pane->width,
-                      pane->height)) {
-        return i;
+    for (int c = col; c < col + currentPane->width; c++) {
+      for (int i = 0; i < w->pane_count; i++) {
+        Pane *pane = &w->panes[i];
+        if (within_rect(c, row, pane->col, pane->row, pane->width,
+                        pane->height)) {
+          return i;
+        }
       }
     }
     row++;
   }
-}
-
-// TODO: This should happen on the client side
-char *get_user_input(int socket, char *prompt) {
-  write(socket, "NTMUX_GET_INPUT", 15);
-  // char buf[1024];
-  // int read_size = recv(socket, buf, 1024, 0);
-  // if (read_size == 0) {
-  //   printf("Client disconnected (%d)\n", socket);
-  //   fflush(stdout);
-  //   return NULL;
-  // } else if (read_size == -1) {
-  //   perror("recv failed");
-  //   return NULL;
-  // } else {
-  //   char *ret = malloc(read_size+1);
-  //   memcpy(ret, buf, read_size);
-  //   ret[read_size] = '\0';
-  //   return ret;
-  // }
-  // return NULL;
-
-  // char input[1024];
-  // int idx = 0;
-
-  // Session *session = &neotmux->sessions[neotmux->current_session];
-  // Window *window = &session->windows[session->current_window];
-  // char buf[32];
-  // int n = snprintf(buf, 32, "\033[%d;%dH", window->height + 1, 1);
-  // write(socket, buf, n);
-
-  // char *clear_line = "\033[2K";
-  // write(socket, clear_line, strlen(clear_line));
-
-  // send(socket, prompt, strlen(prompt), 0);
-  // while (true) {
-  //   char buf[2];
-  //   int read_size = recv(socket, buf, 2, 0);
-  //   if (read_size == 0) {
-  //     printf("Client disconnected (%d)\n", socket);
-  //     fflush(stdout);
-  //     return NULL;
-  //   } else if (read_size == -1) {
-  //     perror("recv failed");
-  //     return NULL;
-  //   } else if (read_size == 2 && buf[0] == 'e') {
-  //     if (buf[1] == '\n') {
-  //       input[idx] = '\0';
-  //       return strdup(input);
-  //     } else {
-  //       input[idx++] = buf[1];
-  //       send(socket, buf + 1, 1, 0);
-  //     }
-  //   }
-  // }
 }
 
 // TODO: Rework this code
@@ -276,10 +266,11 @@ char *get_user_input(int socket, char *prompt) {
 bool handle_input(int socket, char *buf, int read_size) {
   if (read_size == 0) { // Client disconnected
     printf("Client disconnected (%d)\n", socket);
-    fflush(stdout);
+    ctrl_c(0); // TODO: This is a hack
     return false;
   } else if (read_size == -1) { // Error
-    perror("recv failed");
+    printf("Error reading from client (%d)\n", socket);
+    ctrl_c(0); // TODO: This is a hack
     return false;
   } else if (buf[0] == 's') { // Size
     uint32_t width;
@@ -349,35 +340,40 @@ bool handle_input(int socket, char *buf, int read_size) {
       // VTERM_PROP_MOUSE_MOVE,
       // TODO: Handle all mouse states
       if (pane->process.mouse != VTERM_PROP_MOUSE_NONE) {
-        pthread_mutex_lock(&mutex);
         write(pane->process.fd, buf + 1, read_size - 1);
         // TODO: This triggers a redraw, which we might not want.
-        pthread_mutex_unlock(&mutex);
       }
     } else {
-      pthread_mutex_lock(&mutex);
       Session *session = &neotmux->sessions[neotmux->current_session];
-      Window w = session->windows[session->current_window];
-      Pane p = w.panes[w.current_pane];
-      int fd = p.process.fd;
+      Window *w = &session->windows[session->current_window];
+      Pane *p = &w->panes[w->current_pane];
+      int fd = p->process.fd;
       write(fd, buf + 1, read_size - 1);
-      pthread_mutex_unlock(&mutex);
     }
   } else if (buf[0] == 'c') { // Command
     char cmd[read_size];
     memcpy(cmd, buf + 1, read_size - 1);
     cmd[read_size - 1] = '\0';
 
-    pthread_mutex_lock(&mutex);
     Session *session = &neotmux->sessions[neotmux->current_session];
     Window *w = &session->windows[session->current_window];
 
     if (strcmp(cmd, "Create") == 0) {
       Session *session = &neotmux->sessions[neotmux->current_session];
-      Window *window = add_window(session, "New Window");
+      Window *window;
+      char *title = get_global_string(neotmux->lua, "default_title");
+      if (title) {
+        window = add_window(session, title);
+        free(title);
+      } else {
+        window = add_window(session, "New Window");
+      }
+      window->width = w->width;
+      window->height = w->height;
       add_pane(window, 0, 0, window->width, window->height);
       add_process_to_pane(&window->panes[0]);
-      calculate_layout(window);
+      session->current_window = session->window_count - 1;
+      calculate_layout(&session->windows[session->current_window]);
       dirty = true;
     } else if (strcmp(cmd, "VSplit") == 0) {
       Pane *currentPane = &w->panes[w->current_pane];
@@ -466,6 +462,16 @@ bool handle_input(int socket, char *buf, int read_size) {
       }
       calculate_layout(w);
       dirty = true;
+    } else if (strcmp(cmd, "ScrollUp") == 0) {
+      printf("Scroll Up\n");
+      Pane *p = &w->panes[w->current_pane];
+      vterm_keyboard_unichar(p->process.vt, VTERM_KEY_UP, 0);
+      dirty = true;
+    } else if (strcmp(cmd, "ScrollDown") == 0) {
+      printf("Scroll Down\n");
+      Pane *p = &w->panes[w->current_pane];
+      vterm_keyboard_unichar(p->process.vt, VTERM_KEY_DOWN, 0);
+      dirty = true;
     } else if (memcmp(cmd, "RenameWindow", 12) == 0) {
       printf("Rename Window\n");
       Window *window = &session->windows[session->current_window];
@@ -483,20 +489,44 @@ bool handle_input(int socket, char *buf, int read_size) {
     } else if (strcmp(cmd, "Reload") == 0) {
       printf("Reloading (%d)\n", socket);
       fflush(stdout);
-      pthread_mutex_unlock(&mutex);
       close(socket);
       exit(EXIT_SUCCESS);
     } else {
       printf("Unhandled command (%d): %s\n", socket, cmd);
       fflush(stdout);
     }
-    pthread_mutex_unlock(&mutex);
   } else {
     printf("Unhandled input (%d)\n", socket);
     fflush(stdout);
   }
 
   return true;
+}
+
+void reorder_windows() {
+  for (int i = 0; i < neotmux->session_count; i++) {
+    Session *session = &neotmux->sessions[i];
+    for (int j = 0; j < session->window_count; j++) {
+      Window *w = &session->windows[j];
+      if (w->pane_count == 0) {
+        for (int k = j; k < session->window_count - 1; k++) {
+          session->windows[k] = session->windows[k + 1];
+        }
+        session->window_count--;
+        j--;
+        if (session->current_window >= session->window_count) {
+          session->current_window = session->window_count - 1;
+        }
+      }
+    }
+  }
+}
+
+void delete_window(Window *w) {
+  w->pane_count = 0;
+  w->current_pane = -1;
+
+  reorder_windows();
 }
 
 void reorder_panes(Window *w) {
@@ -513,6 +543,14 @@ void reorder_panes(Window *w) {
   }
   if (w->current_pane >= w->pane_count) {
     w->current_pane = w->pane_count - 1;
+  }
+
+  if (w->zoom >= w->pane_count) {
+    w->zoom = -1;
+  }
+
+  if (w->pane_count == 0) {
+    delete_window(w);
   }
 }
 
@@ -538,16 +576,20 @@ void *client_handler(void *socket_desc) {
     pthread_mutex_lock(&neotmux->mutex);
     for (int i = 0; i < neotmux->session_count; i++) {
       Session *session = &neotmux->sessions[i];
-      Window w = session[i].windows[session[i].current_window];
-      for (int j = 0; j < w.pane_count; j++) {
-        Pane p = w.panes[j];
-        if (p.process.closed) {
+      if (session[i].current_window < 0) {
+        continue;
+      }
+      // TODO: Should be pointers
+      Window *w = &session[i].windows[session[i].current_window];
+      for (int j = 0; j < w->pane_count; j++) {
+        Pane *p = &w->panes[j];
+        if (p->process.closed) {
           continue;
         }
 
-        FD_SET(p.process.fd, &fds);
-        if (p.process.fd > max_fd) {
-          max_fd = p.process.fd;
+        FD_SET(p->process.fd, &fds);
+        if (p->process.fd > max_fd) {
+          max_fd = p->process.fd;
         }
       }
     }
@@ -562,6 +604,9 @@ void *client_handler(void *socket_desc) {
     pthread_mutex_lock(&neotmux->mutex);
     for (int i = 0; i < neotmux->session_count; i++) {
       Session *session = &neotmux->sessions[i];
+      if (session[i].current_window < 0) {
+        continue;
+      }
       Window *w = &session[i].windows[session[i].current_window];
       for (int j = 0; j < w->pane_count; j++) {
         Pane *p = &w->panes[j];
@@ -593,13 +638,18 @@ void *client_handler(void *socket_desc) {
     pthread_mutex_lock(&neotmux->mutex);
     if (retval && FD_ISSET(socket, &fds)) {
       char buf[32];
-      int read_size = recv(socket, buf, 32, 0);
+      int read_size = receive(socket, buf, 32);
       if (!handle_input(socket, buf, read_size)) {
         break;
       }
     } else if (retval == 0) { // Timeout
       if (dirty) {
         Session *session = &neotmux->sessions[neotmux->current_session];
+        if (session->window_count == 0) {
+          printf("No windows\n");
+          send(socket, "e", 1, 0);
+          ctrl_c(0); // TODO: This is a hack
+        }
         Window *w = &session->windows[session->current_window];
         render_screen(socket, w->height, w->width);
         dirty = false;
