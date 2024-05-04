@@ -44,17 +44,21 @@ void disable_mouse_tracking() {
   // write(STDOUT_FILENO, "\033[?1006l", 8); // Extended mouse tracking
 }
 
+// TODO: This is a hack
+bool rawMode = false;
 void enter_raw_mode() {
   tcgetattr(STDIN_FILENO, &term);
   term.c_lflag &= ~(ICANON | ECHO);
   tcsetattr(STDIN_FILENO, TCSANOW, &term);
   enable_mouse_tracking();
+  rawMode = true;
 }
 
 void reset_mode() {
   disable_mouse_tracking();
   term.c_lflag |= ICANON | ECHO;
   tcsetattr(STDIN_FILENO, TCSANOW, &term);
+  rawMode = false;
 }
 
 void configure_server(struct sockaddr_in *server, int port) {
@@ -91,8 +95,10 @@ bool receive_message(int sock) {
     } else if (read_size == 1 && strncmp(server_reply, "e", 1) == 0) {
       return false;
     }
-    write(STDOUT_FILENO, server_reply, read_size);
-    fflush(stdout);
+    if (rawMode) {
+      write(STDOUT_FILENO, server_reply, read_size);
+      fflush(stdout);
+    }
   } else {
     puts("Timeout (This should not happen)");
     return false;
