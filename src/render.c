@@ -1,171 +1,89 @@
-#include <render.h>
+#include <lua5.4/lauxlib.h>
+#include <lua5.4/lua.h>
+#include <lua5.4/lualib.h>
 #include <stdio.h>
-#include <string.h>
+#include <time.h>
 #include <unistd.h>
-#include <util.h>
-#include <vterm.h>
 
-// TODO: Determine the correct buffer size
-#define BUF_SIZE 100000
+#include "render_cell.h"
+#include "session.h"
+#include "statusbar.h"
 
-enum BarPosition { TOP, BOTTOM };
+extern Neotmux *neotmux;
 
-int barPos = BOTTOM;
-int bold = 0;
-VTermColor bg = {0};
-VTermColor fg = {0};
+// TODO: Only show floating window on first call of render_screen
+// Maybe that should happen on the client instead
+typedef struct FloatingWindow {
+  int height;
+  int width;
+  bool visible;
+  VTerm *vt;
+  VTermScreen *vts;
+} FloatingWindow;
 
-typedef struct BackBuffer {
-  char buffer[BUF_SIZE];
-  int n;
-} BackBuffer;
+FloatingWindow *floatingWindow = NULL;
 
-BackBuffer bb;
-
-void bbWrite(const void *buf, size_t count) {
-  memcpy(bb.buffer + bb.n, buf, count);
-  bb.n += count;
-}
-
-void bbClear() { bb.n = 0; }
-
-bool isInRect(int row, int col, int rowRect, int colRect, int height,
-              int width) {
+bool is_in_rect(int row, int col, int rowRect, int colRect, int height,
+                int width) {
   return row >= rowRect && row < rowRect + height && col >= colRect &&
          col < colRect + width;
 }
 
-bool compareColors(VTermColor a, VTermColor b) {
-  if (a.type != b.type) {
+void write_position(int row, int col) {
+  char buf[32];
+  int n = snprintf(buf, 32, "\033[%d;%dH", row, col);
+  buf_write(buf, n);
+}
+
+void clear_style() {
+  bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));
+  buf_write("\033[0m", 4); // Reset style
+}
+
+bool is_border(int row, int col, Window *window) {
+  for (int i = 0; i < window->pane_count; i++) {
+    Pane *pane = &window->panes[i];
+    if (is_in_rect(row, col, pane->row, pane->col, pane->height, pane->width)) {
+      return false;
+    }
+  }
+
+  bool outsideAllPanes = true;
+  for (int i = 0; i < window->pane_count; i++) {
+    Pane *pane = &window->panes[i];
+    if (is_in_rect(row, col, pane->row - 1, pane->col - 1, pane->height + 2,
+                   pane->width + 2)) {
+      outsideAllPanes = false;
+      break;
+    }
+  }
+
+  if (outsideAllPanes) {
     return false;
   }
 
-  if (a.type == VTERM_COLOR_DEFAULT_FG || a.type == VTERM_COLOR_DEFAULT_BG) {
-    return true;
-  }
+  return true;
+}
 
-  if (VTERM_COLOR_IS_INDEXED(&a) && VTERM_COLOR_IS_INDEXED(&b)) {
-    return a.indexed.idx == b.indexed.idx;
-  }
+bool is_bordering_active_pane(int row, int col, Window *window) {
+  Pane *pane = &window->panes[window->current_pane];
 
-  if (VTERM_COLOR_IS_RGB(&a) && VTERM_COLOR_IS_RGB(&b)) {
-    return a.rgb.red == b.rgb.red && a.rgb.green == b.rgb.green &&
-           a.rgb.blue == b.rgb.blue;
+  for (int x = -1; x <= 1; x++) {
+    for (int y = -1; y <= 1; y++) {
+      if (is_in_rect(row, col, pane->row + y, pane->col + x, pane->height,
+                     pane->width)) {
+        return true;
+      }
+    }
   }
 
   return false;
 }
 
-void bbWriteIndexed(int idx, int type) {
-  char buf[32];
-  int n = snprintf(buf, 32, "\033[%d;5;%dm", type, idx);
-  bbWrite(buf, n);
-}
-
-void bbWriteRGB(int red, int green, int blue, int type) {
-  char buf[32];
-  int n = snprintf(buf, 32, "\033[%d;2;%d;%d;%dm", type, red, green, blue);
-  bbWrite(buf, n);
-}
-
-void renderCell(VTermScreenCell cell) {
-  if (cell.attrs.bold != bold) {
-    bbWrite("\033[1m", 4);
-    bold = cell.attrs.bold;
-  }
-
-  if (!compareColors(cell.bg, bg)) {
-    if (cell.bg.type == VTERM_COLOR_DEFAULT_BG) {
-    } else if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
-      bbWriteIndexed(cell.bg.indexed.idx, 48);
-    } else if (VTERM_COLOR_IS_RGB(&cell.bg)) {
-      bbWriteRGB(cell.bg.rgb.red, cell.bg.rgb.green, cell.bg.rgb.blue, 48);
-    }
-    bg = cell.bg;
-  }
-
-  if (!compareColors(cell.fg, fg)) {
-    if (VTERM_COLOR_IS_INDEXED(&cell.fg)) {
-      bbWriteIndexed(cell.fg.indexed.idx, 38);
-    } else if (VTERM_COLOR_IS_RGB(&cell.fg)) {
-      bbWriteRGB(cell.fg.rgb.red, cell.fg.rgb.green, cell.fg.rgb.blue, 38);
-    }
-    fg = cell.fg;
-  }
-
-  if (cell.chars[0] == 0) {
-    bbWrite(" ", 1);
-  } else {
-    for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i]; i++) {
-      char bytes[6];
-      int len = fill_utf8(cell.chars[i], bytes);
-      bytes[len] = 0;
-      bbWrite(bytes, len);
-    }
-  }
-}
-
-void infoBar(int rows, int cols) {
-  bbWrite("\033[0m", 4); // Reset colors
-  bbWrite("\033[7m", 4); // Invert colors
-  char buf[BUF_SIZE];
-  static int frame = 0;
-  int n = snprintf(buf, BUF_SIZE, "Rows: %d, Cols: %d, Frame: %d", rows, cols,
-                   frame);
-  frame++;
-  bbWrite(buf, n);
-  bbWrite("\033[0m", 4);
-  bbWrite("\r\n", 2);
-}
-
-void color(int color) {
-  char buf[BUF_SIZE];
-  int n = snprintf(buf, BUF_SIZE, "\033[38;5;%dm", color);
-  bbWrite(buf, n);
-}
-
-void statusBar(int cols) {
-  bbWrite("\033[7m", 4); // Invert colors
-  color(2);
-
-  int idx = 0;
-  char buf[cols];
-
-  char sessionName[] = "0";
-  int paneIndex = 0;
-  char paneName[] = "bash";
-
-  int n = snprintf(buf, cols, "[%s] ", sessionName);
-  bbWrite(buf, n);
-  idx += n;
-
-  n = snprintf(buf, cols, "%d:%s*", paneIndex, paneName);
-  bbWrite(buf, n);
-  idx += n;
-
-  char *statusRight = "Hello, World!";
-  idx += strlen(statusRight);
-
-  for (int i = idx; i < cols; i++) {
-    bbWrite(" ", 1);
-  }
-
-  bbWrite(statusRight, strlen(statusRight));
-
-  bbWrite("\033[0m", 4);
-}
-
-void clearStyle() {
-  bzero(&bg, sizeof(bg));
-  bzero(&fg, sizeof(fg));
-  bold = 0;
-  bbWrite("\033[0m", 4);
-}
-
-bool isInWindow(int row, int col, Pane *pane, int nPanes) {
-  for (int i = 0; i < nPanes; i++) {
-    if (isInRect(row, col, pane[i].row, pane[i].col, pane[i].height,
-                 pane[i].width)) {
+bool is_in_pane(int row, int col, Window *window) {
+  for (int i = 0; i < window->pane_count; i++) {
+    Pane *pane = &window->panes[i];
+    if (is_in_rect(row, col, pane->row, pane->col, pane->height, pane->width)) {
       return true;
     }
   }
@@ -173,132 +91,251 @@ bool isInWindow(int row, int col, Pane *pane, int nPanes) {
   return false;
 }
 
-void writeBorderCharacter(int row, int col, Pane *panes, int nPanes) {
+void write_border_character(int row, int col, Window *window) {
+  if (is_in_pane(row, col, window)) {
+    buf_write("\033[1C", 4);
+    return;
+  }
 
-  bool r = isInWindow(row + 1, col, panes, nPanes) ||
-           isInWindow(row - 1, col, panes, nPanes) ||
-           (isInWindow(row + 1, col + 1, panes, nPanes) &&
-            !isInWindow(row, col + 1, panes, nPanes)) ||
-           (isInWindow(row - 1, col + 1, panes, nPanes) &&
-            !isInWindow(row, col + 1, panes, nPanes));
+  bool r = is_border(row, col + 1, window);
+  bool l = is_border(row, col - 1, window);
+  bool d = is_border(row + 1, col, window);
+  bool u = is_border(row - 1, col, window);
 
-  bool l = isInWindow(row + 1, col, panes, nPanes) ||
-           isInWindow(row - 1, col, panes, nPanes) ||
-           (isInWindow(row + 1, col - 1, panes, nPanes) &&
-            !isInWindow(row, col - 1, panes, nPanes)) ||
-           (isInWindow(row - 1, col - 1, panes, nPanes) &&
-            !isInWindow(row, col - 1, panes, nPanes));
-
-  bool d = isInWindow(row, col + 1, panes, nPanes) ||
-           isInWindow(row, col - 1, panes, nPanes) ||
-           (isInWindow(row + 1, col + 1, panes, nPanes) &&
-            !isInWindow(row + 1, col, panes, nPanes)) ||
-           (isInWindow(row + 1, col - 1, panes, nPanes) &&
-            !isInWindow(row + 1, col, panes, nPanes));
-
-  bool u = isInWindow(row, col + 1, panes, nPanes) ||
-           isInWindow(row, col - 1, panes, nPanes) ||
-           (isInWindow(row - 1, col + 1, panes, nPanes) &&
-            !isInWindow(row - 1, col, panes, nPanes)) ||
-           (isInWindow(row - 1, col - 1, panes, nPanes) &&
-            !isInWindow(row - 1, col, panes, nPanes));
-
-  if (false) {
-  } else if (u && d && l && r) {
-    bbWrite("┼", 3);
+  if (u && d && l && r) {
+    buf_write("┼", 3);
   } else if (u && d && l && !r) {
-    bbWrite("┤", 3);
+    buf_write("┤", 3);
   } else if (u && d && !l && r) {
-    bbWrite("├", 3);
+    buf_write("├", 3);
   } else if (u && d && !l && !r) {
-    bbWrite("│", 3);
+    buf_write("│", 3);
   } else if (u && !d && l && r) {
-    bbWrite("┴", 3);
+    buf_write("┴", 3);
   } else if (u && !d && l && !r) {
-    bbWrite("┘", 3);
+    buf_write("┘", 3);
   } else if (u && !d && !l && r) {
-    bbWrite("└", 3);
+    buf_write("└", 3);
   } else if (!u && d && l && r) {
-    bbWrite("┬", 3);
+    buf_write("┬", 3);
   } else if (!u && d && l && !r) {
-    bbWrite("┐", 3);
+    buf_write("┐", 3);
   } else if (!u && d && !l && r) {
-    bbWrite("┌", 3);
+    buf_write("┌", 3);
   } else if (!u && !d && l && r) {
-    bbWrite("─", 3);
+    buf_write("─", 3);
   } else {
-    bbWrite(" ", 1);
+    buf_write(" ", 1);
   }
 }
 
-void renderScreen(int fd, Pane *panes, int nPanes, int activeTerm, int rows,
-                  int cols) {
-  bb.n = 0;
-
-  bbWrite("r", 1);
-
-  size_t s = -1;
-  bbWrite(&s, sizeof(size_t));
-
-  bbWrite("\033[H", 3); // Move cursor to top left
-
-  // infoBar(rows, cols);
-
-  if (barPos == TOP) {
-    statusBar(cols);
-    bbWrite("\r\n", 2);
-  }
-
+void write_cursor_position() {
   VTermPos cursorPos;
-  vterm_state_get_cursorpos(vterm_obtain_state(panes[activeTerm].vt),
-                            &cursorPos);
+  Session *currentSession = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow =
+      &currentSession->windows[currentSession->current_window];
+  if (currentWindow->current_pane != -1) {
+    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
+    VTermState *state = vterm_obtain_state(currentPane->process.vt);
+    vterm_state_get_cursorpos(state, &cursorPos);
+    cursorPos.row += currentPane->row;
+    cursorPos.col += currentPane->col;
 
-  for (int row = 0; row < rows; row++) {
-    for (int col = 0; col < cols; col++) {
-      if (cursorPos.row == row - panes[activeTerm].row &&
-          cursorPos.col == col - panes[activeTerm].col) {
-        bbWrite("\033[7m", 4); // Invert colors
-      }
-      bool isRendered = false;
-      for (int k = 0; k < nPanes; k++) {
-        if (panes[k].closed) {
-          continue;
-        }
+    if (neotmux->barPos == BAR_TOP) {
+      cursorPos.row++;
+    }
 
-        if (isInRect(row, col, panes[k].row, panes[k].col, panes[k].height,
-                     panes[k].width)) {
-          VTermPos pos;
-          pos.row = row - panes[k].row;
-          pos.col = col - panes[k].col;
-          VTermScreen *vts = panes[k].vts;
+    write_position(cursorPos.row + 1, cursorPos.col + 1);
+  }
+}
 
+void write_cursor_style() {
+  Session *currentSession = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow =
+      &currentSession->windows[currentSession->current_window];
+  if (currentWindow->current_pane != -1) {
+    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
+    if (currentPane->process.cursor_visible) {
+      buf_write("\033[?25h", 6); // Show cursor
+    } else {
+      buf_write("\033[?25l", 6); // Hide cursor
+    }
+
+    switch (currentPane->process.cursor_shape) {
+    case VTERM_PROP_CURSORSHAPE_BLOCK:
+      buf_write("\033[0 q", 6); // Block cursor
+      break;
+    case VTERM_PROP_CURSORSHAPE_UNDERLINE:
+      buf_write("\033[3 q", 6); // Underline cursor
+      break;
+    case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
+      buf_write("\033[5 q", 6); // Vertical bar cursor
+      break;
+    default:
+      break;
+    }
+  }
+}
+
+void draw_pane(Pane *pane, Window *window) {
+  clear_style();
+  for (int row = pane->row; row < pane->row + pane->height; row++) {
+    write_position(row + 1, pane->col + 1);
+    for (int col = pane->col; col < pane->col + pane->width; col++) {
+      VTermPos pos;
+      pos.row = row - pane->row;
+      pos.col = col - pane->col;
+      VTermScreen *vts = pane->process.vts;
+
+      VTermScreenCell cell = {0};
+      vterm_screen_get_cell(vts, pos, &cell);
+      render_cell(cell);
+    }
+  }
+}
+
+void draw_borders(Window *window) {
+  buf_color(2);
+  for (int row = 0; row < window->height; row++) {
+    write_position(row + 1, 1);
+    for (int col = 0; col < window->width; col++) {
+      write_border_character(row, col, window);
+    }
+  }
+}
+
+void draw_floating_window(FloatingWindow *floatingWindow, Window *window) {
+  if (floatingWindow->visible) {
+    clear_style();
+    for (int row = 0; row < floatingWindow->height; row++) {
+      write_position(row + 1, 1);
+      for (int col = 0; col < floatingWindow->width; col++) {
+        if (is_in_rect(row, col, 0, 0, floatingWindow->height,
+                       floatingWindow->width)) {
           VTermScreenCell cell = {0};
+          VTermPos pos;
+          pos.row = row;
+          pos.col = col;
+          VTermScreen *vts = floatingWindow->vts;
           vterm_screen_get_cell(vts, pos, &cell);
-          renderCell(cell);
-          isRendered = true;
-          break;
+          cell.bg.type = VTERM_COLOR_INDEXED;
+          cell.bg.indexed.idx = 8;
+          render_cell(cell);
         }
       }
-      if (!isRendered) {
-        clearStyle();
-        writeBorderCharacter(row, col, panes, nPanes);
-      }
-      if (cursorPos.row == row - panes[activeTerm].row &&
-          cursorPos.col == col - panes[activeTerm].col) {
-        bbWrite("\033[0m", 4);
-      }
     }
-    if (row < rows - 1) {
-      clearStyle();
-      bbWrite("\r\n", 2);
+  }
+}
+
+char *read_file(const char *filename) {
+  FILE *file = fopen(filename, "r");
+  if (!file) {
+    return NULL;
+  }
+
+  fseek(file, 0, SEEK_END);
+  long length = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  char *buffer = malloc(length + 1);
+  if (!buffer) {
+    fclose(file);
+    return NULL;
+  }
+
+  fread(buffer, 1, length, file);
+  fclose(file);
+  buffer[length] = '\0';
+
+  return buffer;
+}
+
+void render_bar(int fd, int rows, int cols) {
+  neotmux->bb.n = 0;
+
+  if (neotmux->barPos == BAR_TOP) {
+    write_position(1, 1);
+    write_status_bar(cols);
+  } else if (neotmux->barPos == BAR_BOTTOM) {
+    write_position(rows + 1, 1);
+    write_status_bar(cols);
+  }
+
+  write_cursor_position();
+  write_cursor_style();
+
+  write(fd, neotmux->bb.buffer, neotmux->bb.n);
+}
+
+void render_screen(int fd, int rows, int cols) {
+  if (!floatingWindow) {
+    floatingWindow = malloc(sizeof(FloatingWindow));
+    floatingWindow->height = 43;
+    floatingWindow->width = 80;
+    floatingWindow->visible = false;
+
+    VTerm *vt;
+    VTermScreen *vts;
+    vt = vterm_new(floatingWindow->height, floatingWindow->width);
+    vts = vterm_obtain_screen(vt);
+
+    static VTermScreenCallbacks callbacks;
+    callbacks.damage = NULL;
+    callbacks.moverect = NULL;
+    callbacks.movecursor = NULL;
+    callbacks.settermprop = NULL;
+    callbacks.bell = NULL;
+    callbacks.resize = NULL;
+    callbacks.sb_pushline = NULL;
+    callbacks.sb_popline = NULL;
+
+    vterm_set_utf8(vt, 1);
+    vterm_screen_reset(vts, 1);
+    vterm_screen_set_callbacks(vts, &callbacks, NULL);
+
+    char *data = read_file("dosascii");
+    vterm_input_write(vt, data, strlen(data));
+    free(data);
+    floatingWindow->vt = vt;
+    floatingWindow->vts = vts;
+  }
+
+  if (neotmux->barPos == BAR_NONE) {
+    neotmux->barPos = BAR_BOTTOM;
+
+    lua_getglobal(neotmux->lua, "bar_position");
+    if (!lua_isstring(neotmux->lua, -1)) {
+      lua_pop(neotmux->lua, 1);
+    } else {
+      if (strcmp(lua_tostring(neotmux->lua, -1), "top") == 0) {
+        neotmux->barPos = BAR_TOP;
+      }
+      lua_pop(neotmux->lua, 1);
     }
   }
 
-  if (barPos == BOTTOM) {
-    bbWrite("\r\n", 2);
-    statusBar(cols);
+  if (neotmux->bb.buffer == NULL) {
+    neotmux->bb.buffer = malloc(100);
+    neotmux->bb.capacity = 100;
   }
 
-  memcpy(bb.buffer + 1, &bb.n, sizeof(size_t));
-  write(fd, bb.buffer, bb.n);
+  neotmux->bb.n = 0;
+
+  Session *currentSession = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow =
+      &currentSession->windows[currentSession->current_window];
+  if (currentWindow->zoom != -1) {
+    Pane *pane = &currentWindow->panes[currentWindow->zoom];
+    draw_pane(pane, currentWindow);
+  } else {
+    for (int k = 0; k < currentWindow->pane_count; k++) {
+      Pane *pane = &currentWindow->panes[k];
+      draw_pane(pane, currentWindow);
+    }
+    draw_borders(currentWindow);
+  }
+
+  draw_floating_window(floatingWindow, currentWindow);
+
+  write(fd, neotmux->bb.buffer, neotmux->bb.n);
 }

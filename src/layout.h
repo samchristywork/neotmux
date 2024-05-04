@@ -1,8 +1,8 @@
 #ifndef LAYOUT_H
 #define LAYOUT_H
 
-#include <render.h>
+#include "session.h"
 
-void calculateLayout(Pane *panes, int nPanes, int height, int width);
+void calculate_layout(Window *window);
 
 #endif

@@ -1,6 +1,6 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-void client();
+int start_client(int port);
 
 #endif

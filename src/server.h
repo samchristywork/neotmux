@@ -1,6 +1,6 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-void server();
+int start_server(int port);
 
 #endif
