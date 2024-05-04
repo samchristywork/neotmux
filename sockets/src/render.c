@@ -129,41 +129,70 @@ void write_border_character(int row, int col, Window *window) {
   }
 }
 
-void write_info_bar(int row) {
-  write_position(row, 1);
-  buf_write("\033[2K", 4); // Clear line
-  char *result = apply_lua_string_function(neotmux->lua, "neotmux_info");
-  if (result != NULL) {
-    buf_write(result, strlen(result));
-    free(result);
+void write_cursor_position() {
+  VTermPos cursorPos;
+  Session *currentSession = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow =
+      &currentSession->windows[currentSession->current_window];
+  if (currentWindow->current_pane != -1) {
+    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
+    VTermState *state = vterm_obtain_state(currentPane->process.vt);
+    vterm_state_get_cursorpos(state, &cursorPos);
+    cursorPos.row += currentPane->row;
+    cursorPos.col += currentPane->col;
+
+    if (neotmux->barPos == BAR_TOP) {
+      cursorPos.row++;
+    }
+
+    write_position(cursorPos.row + 1, cursorPos.col + 1);
   }
 }
 
-void render_screen(int fd, int rows, int cols) {
-  if (barPos == BAR_NONE) {
-    barPos = BAR_BOTTOM;
-
-    lua_getglobal(neotmux->lua, "bar_position");
-    if (!lua_isstring(neotmux->lua, -1)) {
-      lua_pop(neotmux->lua, 1);
+void write_cursor_style() {
+  Session *currentSession = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow =
+      &currentSession->windows[currentSession->current_window];
+  if (currentWindow->current_pane != -1) {
+    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
+    if (currentPane->process.cursor_visible) {
+      buf_write("\033[?25h", 6); // Show cursor
     } else {
-      if (strcmp(lua_tostring(neotmux->lua, -1), "top") == 0) {
-        barPos = BAR_TOP;
-      }
-      lua_pop(neotmux->lua, 1);
+      buf_write("\033[?25l", 6); // Hide cursor
+    }
+
+    switch (currentPane->process.cursor_shape) {
+    case VTERM_PROP_CURSORSHAPE_BLOCK:
+      buf_write("\033[0 q", 6); // Block cursor
+      break;
+    case VTERM_PROP_CURSORSHAPE_UNDERLINE:
+      buf_write("\033[3 q", 6); // Underline cursor
+      break;
+    case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
+      buf_write("\033[5 q", 6); // Vertical bar cursor
+      break;
+    default:
+      break;
     }
   }
+}
 
-  if (neotmux->bb.buffer == NULL) {
-    neotmux->bb.buffer = malloc(100);
-    neotmux->bb.capacity = 100;
+void draw_pane(Pane *pane, Window *window) {
+  clear_style();
+  for (int row = pane->row; row < pane->row + pane->height; row++) {
+    write_position(row + 1, pane->col + 1);
+    for (int col = pane->col; col < pane->col + pane->width; col++) {
+      VTermPos pos;
+      pos.row = row - pane->row;
+      pos.col = col - pane->col;
+      VTermScreen *vts = pane->process.vts;
+
+      VTermScreenCell cell = {0};
+      vterm_screen_get_cell(vts, pos, &cell);
+      render_cell(cell);
+    }
   }
-
-  // This may fix weird artifacts in E.g. `man ls`
-  // TODO: Potential performance improvement
-  bzero(neotmux->bb.buffer, neotmux->bb.capacity);
-
-  neotmux->bb.n = 0;
+}
 
 void draw_borders(Window *window) {
   buf_color(2);
@@ -224,28 +253,19 @@ char *read_file(const char *filename) {
 void render_bar(int fd, int rows, int cols) {
   neotmux->bb.n = 0;
 
-  // TODO: This should be done asynchronously
-  if (barPos == BAR_TOP) {
+  if (neotmux->barPos == BAR_TOP) {
     write_position(1, 1);
     write_status_bar(cols);
-  } else if (barPos == BAR_BOTTOM) {
+  } else if (neotmux->barPos == BAR_BOTTOM) {
     write_position(rows + 1, 1);
     write_status_bar(cols);
   }
 
-  write_info_bar(rows + 2);
+  write_cursor_position();
+  write_cursor_style();
 
-  {
-    VTermPos cursorPos;
-    Session *currentSession = &neotmux->sessions[neotmux->current_session];
-    Window *currentWindow =
-        &currentSession->windows[currentSession->current_window];
-    if (currentWindow->current_pane != -1) {
-      Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
-      VTermState *state = vterm_obtain_state(currentPane->process.vt);
-      vterm_state_get_cursorpos(state, &cursorPos);
-      cursorPos.row += currentPane->row;
-      cursorPos.col += currentPane->col;
+  write(fd, neotmux->bb.buffer, neotmux->bb.n);
+}
 
 void render_screen(int fd, int rows, int cols) {
   if (!floatingWindow) {

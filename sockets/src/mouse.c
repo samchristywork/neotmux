@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "layout.h"
 #include "session.h"
 
 extern Neotmux *neotmux;
@@ -40,7 +39,6 @@ bool handle_mouse(int socket, char *buf, int read_size) {
       if (is_inside_rect(rect, pos)) {
         printf("Found pane %d\n", i);
         w->current_pane = i;
-        calculate_layout(w);
         dirty = true;
         break;
       }
