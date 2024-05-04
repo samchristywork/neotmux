@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <string.h>
 
 #include "lua.h"
 #include "session.h"
@@ -65,8 +64,15 @@ void write_status_bar(int cols) {
     }
   }
 
-  char *statusRight = apply_lua_string_function(neotmux->lua, "status_right");
-  if (statusRight == NULL) {
+  char *statusRight = NULL;
+  lua_getglobal(neotmux->lua, "status_right");
+  if (lua_isfunction(neotmux->lua, -1)) {
+    int idx = neotmux->statusBarIdx;
+    lua_pushinteger(neotmux->lua, idx);
+    lua_call(neotmux->lua, 1, 1);
+    statusRight = strdup(lua_tostring(neotmux->lua, -1));
+    lua_pop(neotmux->lua, 1);
+  } else {
     statusRight = strdup("");
   }
   width += calculate_printed_width(statusRight);

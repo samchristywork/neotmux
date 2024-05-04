@@ -2,6 +2,7 @@
 #define SESSION_H
 
 #include <lua5.4/lua.h>
+#include <string.h>
 #include <vterm.h>
 
 typedef enum Layout {
@@ -13,6 +14,8 @@ typedef enum Layout {
   LAYOUT_TILED,
   LAYOUT_CUSTOM,
 } Layout;
+
+typedef enum BarPosition { BAR_NONE, BAR_TOP, BAR_BOTTOM } BarPosition;
 
 typedef struct Process {
   char *name;
@@ -66,6 +69,8 @@ typedef struct Neotmux {
   lua_State *lua;
   Buffer bb;
   VTermScreenCell prevCell;
+  BarPosition barPos;
+  int statusBarIdx;
 } Neotmux;
 
 #define buf_write(buf, count)                                                  \

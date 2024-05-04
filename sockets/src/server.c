@@ -5,16 +5,8 @@
 #include <lua5.4/lualib.h>
 #include <pthread.h>
 #include <signal.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-#include <termios.h>
 #include <unistd.h>
-#include <vterm.h>
 
 #include "create.h"
 #include "layout.h"
@@ -23,7 +15,6 @@
 #include "move.h"
 #include "print_session.h"
 #include "render.h"
-#include "session.h"
 
 bool dirty = true; // TODO: Dirty should be on a per-pane basis
 Neotmux *neotmux;
@@ -353,6 +344,7 @@ void *handle_client(void *socket_desc) {
   Session *session = &neotmux->sessions[neotmux->current_session];
   Window *w = &session->windows[session->current_window];
   render_screen(socket, w->height, w->width);
+  render_bar(socket, w->height, w->width);
   pthread_mutex_unlock(&neotmux->mutex);
 
   while (1) {
@@ -442,8 +434,13 @@ void *handle_client(void *socket_desc) {
         }
         Window *w = &session->windows[session->current_window];
         render_screen(socket, w->height, w->width);
+        render_bar(socket, w->height, w->width);
         dirty = false;
       }
+      if (frame % 60 == 0) {
+        render_bar(socket, w->height, w->width);
+      }
+      frame++;
     }
     pthread_mutex_unlock(&neotmux->mutex);
   }
@@ -460,6 +457,8 @@ int start_server(int port) {
   neotmux->mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
   bzero(&neotmux->bb, sizeof(neotmux->bb));
   bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));
+  neotmux->barPos = BAR_NONE;
+  neotmux->statusBarIdx = 0;
   neotmux->lua = luaL_newstate();
   luaL_openlibs(neotmux->lua); // What does this do?
   char *lua = "print('Lua initialized')";
@@ -469,7 +468,7 @@ int start_server(int port) {
   char dotfile[PATH_MAX];
   snprintf(dotfile, PATH_MAX, "%s/.ntmux.lua", home);
 
-  if (!execute_lua_file(neotmux->lua, "default.lua")) {
+  if (!execute_lua_file(neotmux->lua, "lua/default.lua")) {
     return EXIT_FAILURE;
   }
 
@@ -479,7 +478,7 @@ int start_server(int port) {
     return EXIT_FAILURE;
   }
 
-  if (!execute_lua_file(neotmux->lua, "init.lua")) {
+  if (!execute_lua_file(neotmux->lua, "lua/init.lua")) {
     return EXIT_FAILURE;
   }
 
