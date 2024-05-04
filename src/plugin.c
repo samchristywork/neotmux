@@ -44,8 +44,13 @@ void load_plugins(lua_State *lua) {
   while ((entry = readdir(dir)) != NULL) {
     if (entry->d_type == DT_DIR && entry->d_name[0] != '.') {
       printf("Loading plugin: %s\n", entry->d_name);
-      char path[PATH_MAX];
-      snprintf(path, PATH_MAX, "%s/%s/init.lua", plugins, entry->d_name);
+      size_t size = strlen(plugins) + strlen(entry->d_name) + 11;
+      if (size > PATH_MAX) {
+        fprintf(stderr, "Path too long\n");
+        continue;
+      }
+      char path[size];
+      snprintf(path, size, "%s/%s/init.lua", plugins, entry->d_name);
       execute_lua_file(lua, path);
     }
   }
