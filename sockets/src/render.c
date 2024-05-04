@@ -13,8 +13,17 @@
 
 extern Neotmux *neotmux;
 
-enum BarPosition { BAR_NONE, BAR_TOP, BAR_BOTTOM };
-int barPos = BAR_NONE;
+// TODO: Only show floating window on first call of render_screen
+// Maybe that should happen on the client instead
+typedef struct FloatingWindow {
+  int height;
+  int width;
+  bool visible;
+  VTerm *vt;
+  VTermScreen *vts;
+} FloatingWindow;
+
+FloatingWindow *floatingWindow = NULL;
 
 bool is_in_rect(int row, int col, int rowRect, int colRect, int height,
                 int width) {
@@ -133,53 +142,23 @@ void render_screen(int fd, int rows, int cols) {
     buf_write("\r\n", 2);
   }
 
-  for (int row = 0; row < rows; row++) {
+void draw_floating_window(FloatingWindow *floatingWindow, Window *window) {
+  if (floatingWindow->visible) {
     clear_style();
-    for (int col = 0; col < cols; col++) {
-      bool isRendered = false;
-      Session *currentSession = &neotmux->sessions[neotmux->current_session];
-      Window *currentWindow =
-          &currentSession->windows[currentSession->current_window];
-      for (int k = 0; k < currentWindow->pane_count; k++) {
-        if (currentWindow->zoom != -1 && k != currentWindow->zoom) {
-          continue;
-        }
-
-        Pane *pane = &currentWindow->panes[k];
-        if (pane->process.closed) {
-          continue;
-        }
-
-        if (is_in_rect(row, col, pane->row, pane->col, pane->height,
-                       pane->width)) {
-          VTermPos pos;
-          pos.row = row - pane->row;
-          pos.col = col - pane->col;
-          VTermScreen *vts = pane->process.vts;
-
+    for (int row = 0; row < floatingWindow->height; row++) {
+      write_position(row + 1, 1);
+      for (int col = 0; col < floatingWindow->width; col++) {
+        if (is_in_rect(row, col, 0, 0, floatingWindow->height,
+                       floatingWindow->width)) {
           VTermScreenCell cell = {0};
+          VTermPos pos;
+          pos.row = row;
+          pos.col = col;
+          VTermScreen *vts = floatingWindow->vts;
           vterm_screen_get_cell(vts, pos, &cell);
+          cell.bg.type = VTERM_COLOR_INDEXED;
+          cell.bg.indexed.idx = 8;
           render_cell(cell);
-          isRendered = true;
-          break;
-        }
-      }
-      if (!isRendered) {
-        clear_style();
-
-        if (is_bordering_active_pane(row, col, currentWindow)) {
-          static int border_color = -1;
-          if (border_color == -1) {
-            border_color = get_lua_int(neotmux->lua, "border_color");
-            if (border_color == 0) {
-              border_color = 4;
-            }
-          }
-          buf_color(border_color);
-          write_border_character(row, col, currentWindow);
-          buf_write("\033[0m", 4);
-        } else {
-          write_border_character(row, col, currentWindow);
         }
       }
     }
@@ -212,14 +191,50 @@ void render_screen(int fd, int rows, int cols) {
       cursorPos.row += currentPane->row;
       cursorPos.col += currentPane->col;
 
-      if (barPos == BAR_TOP) {
-        cursorPos.row++;
-      }
+void render_screen(int fd, int rows, int cols) {
+  if (!floatingWindow) {
+    floatingWindow = malloc(sizeof(FloatingWindow));
+    floatingWindow->height = 43;
+    floatingWindow->width = 80;
+    floatingWindow->visible = false;
 
-      buf_write("\033[", 2);
-      char buf[32];
-      int n = snprintf(buf, 32, "%d;%dH", cursorPos.row + 1, cursorPos.col + 1);
-      buf_write(buf, n);
+    VTerm *vt;
+    VTermScreen *vts;
+    vt = vterm_new(floatingWindow->height, floatingWindow->width);
+    vts = vterm_obtain_screen(vt);
+
+    static VTermScreenCallbacks callbacks;
+    callbacks.damage = NULL;
+    callbacks.moverect = NULL;
+    callbacks.movecursor = NULL;
+    callbacks.settermprop = NULL;
+    callbacks.bell = NULL;
+    callbacks.resize = NULL;
+    callbacks.sb_pushline = NULL;
+    callbacks.sb_popline = NULL;
+
+    vterm_set_utf8(vt, 1);
+    vterm_screen_reset(vts, 1);
+    vterm_screen_set_callbacks(vts, &callbacks, NULL);
+
+    char *data = read_file("dosascii");
+    vterm_input_write(vt, data, strlen(data));
+    free(data);
+    floatingWindow->vt = vt;
+    floatingWindow->vts = vts;
+  }
+
+  if (neotmux->barPos == BAR_NONE) {
+    neotmux->barPos = BAR_BOTTOM;
+
+    lua_getglobal(neotmux->lua, "bar_position");
+    if (!lua_isstring(neotmux->lua, -1)) {
+      lua_pop(neotmux->lua, 1);
+    } else {
+      if (strcmp(lua_tostring(neotmux->lua, -1), "top") == 0) {
+        neotmux->barPos = BAR_TOP;
+      }
+      lua_pop(neotmux->lua, 1);
     }
   }
 
@@ -248,6 +263,8 @@ void render_screen(int fd, int rows, int cols) {
       break;
     }
   }
+
+  draw_floating_window(floatingWindow, currentWindow);
 
   write(fd, neotmux->bb.buffer, neotmux->bb.n);
 }
