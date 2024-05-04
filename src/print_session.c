@@ -78,7 +78,7 @@ void print_process(Process *process) {
 }
 
 void print_pane(Pane *pane) {
-  printf("    Pane: %p\n", pane);
+  printf("    Pane: %p\n", (void *)pane);
   printf("      col: %d\n", pane->col);
   printf("      row: %d\n", pane->row);
   printf("      width: %d\n", pane->width);

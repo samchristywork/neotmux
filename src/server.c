@@ -8,12 +8,10 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "create.h"
+#include "command.h"
 #include "layout.h"
-#include "lua.h"
 #include "mouse.h"
-#include "move.h"
-#include "print_session.h"
+#include "plugin.h"
 #include "render.h"
 
 bool dirty = true; // TODO: Dirty should be on a per-pane basis
@@ -29,12 +27,19 @@ ssize_t read_message(int sock, char *buf, size_t len) {
   return read(sock, buf, size);
 }
 
-int ctrl_c_socket_desc;
+int die_socket_desc = -1;
+void die(char *msg) {
+  if (msg) {
+    printf("%s\n", msg);
+  }
+  close(die_socket_desc);
+  printf("Exiting...\n");
+  exit(EXIT_SUCCESS);
+}
+
 void handle_ctrl_c(int sig) {
   signal(SIGINT, handle_ctrl_c);
-  close(ctrl_c_socket_desc);
-  printf("\nExiting...\n");
-  exit(EXIT_SUCCESS);
+  die("Ctrl-C");
 }
 
 struct sockaddr_in setup_server(int socket_desc, int port) {
@@ -64,217 +69,6 @@ int accept_connection(int socket_desc, struct sockaddr_in client) {
     exit(EXIT_FAILURE);
   }
   return socket;
-}
-
-// TODO: Rework this code
-// All possible inputs should have an associated message
-bool handle_input(int socket, char *buf, int read_size) {
-  if (read_size == 0) { // Client disconnected
-    printf("Client disconnected (%d)\n", socket);
-    handle_ctrl_c(0); // TODO: This is a hack
-    return false;
-  } else if (read_size == -1) { // Error
-    printf("Error reading from client (%d)\n", socket);
-    handle_ctrl_c(0); // TODO: This is a hack
-    return false;
-  } else if (buf[0] == 's') { // Size
-    uint32_t width;
-    uint32_t height;
-    memcpy(&width, buf + 1, sizeof(uint32_t));
-    memcpy(&height, buf + 5, sizeof(uint32_t));
-    printf("Size (%d): %d, %d\n", socket, width, height);
-    Session *session = &neotmux->sessions[neotmux->current_session];
-    Window *window = &session->windows[session->current_window];
-    window->width = width;
-    window->height = height;
-    calculate_layout(window);
-    dirty = true;
-  } else if (buf[0] == 'e') { // Event
-    if (read_size > 7) {
-      read_size = 7; // TODO: Fix this
-    }
-
-    printf("Received (%d):", socket);
-    for (int i = 1; i < read_size; i++) {
-      if (isprint(buf[i])) {
-        printf(" (%d, %c)", buf[i], buf[i]);
-      } else {
-        printf(" (%d)", buf[i]);
-      }
-    }
-    printf("\n");
-    fflush(stdout);
-
-    if (read_size == 7 && buf[1] == '\033' && buf[2] == '[' && buf[3] == 'M') {
-      if (handle_mouse(socket, buf, read_size)) {
-        dirty = true;
-      }
-    } else {
-      Session *session = &neotmux->sessions[neotmux->current_session];
-      Window *w = &session->windows[session->current_window];
-      Pane *p = &w->panes[w->current_pane];
-      int fd = p->process.fd;
-      write(fd, buf + 1, read_size - 1);
-    }
-  } else if (buf[0] == 'c') { // Command
-    char cmd[read_size];
-    memcpy(cmd, buf + 1, read_size - 1);
-    cmd[read_size - 1] = '\0';
-
-    Session *session = &neotmux->sessions[neotmux->current_session];
-    Window *w = &session->windows[session->current_window];
-
-    if (strcmp(cmd, "Create") == 0) {
-      Session *session = &neotmux->sessions[neotmux->current_session];
-      Window *window;
-
-      lua_getglobal(neotmux->lua, "default_title");
-      if (!lua_isstring(neotmux->lua, -1)) {
-        window = add_window(session, "New Window");
-      } else {
-        char *name = (char *)lua_tostring(neotmux->lua, -1);
-        window = add_window(session, name);
-        lua_pop(neotmux->lua, 1);
-      }
-
-      window->width = w->width;
-      window->height = w->height;
-      add_pane(window);
-      session->current_window = session->window_count - 1;
-      calculate_layout(&session->windows[session->current_window]);
-      dirty = true;
-    } else if (strcmp(cmd, "VSplit") == 0) {
-      Pane *currentPane = &w->panes[w->current_pane];
-      int col = currentPane->col;
-      int row = currentPane->row;
-      int width = currentPane->width;
-      int height = currentPane->height;
-
-      Pane *newPane = add_pane(w);
-      calculate_layout(w);
-      w->current_pane = w->pane_count - 1;
-      dirty = true;
-    } else if (strcmp(cmd, "Split") == 0) {
-      Pane *currentPane = &w->panes[w->current_pane];
-      int col = currentPane->col;
-      int row = currentPane->row;
-      int width = currentPane->width;
-      int height = currentPane->height;
-
-      Pane *newPane = add_pane(w);
-      calculate_layout(w);
-      w->current_pane = w->pane_count - 1;
-      dirty = true;
-    } else if (strcmp(cmd, "CycleStatus") == 0) {
-      neotmux->statusBarIdx++;
-      dirty = true;
-    } else if (strcmp(cmd, "List") == 0) {
-      print_sessions(neotmux);
-    } else if (strcmp(cmd, "Next") == 0) {
-      Session *session = &neotmux->sessions[neotmux->current_session];
-      session->current_window++;
-      if (session->current_window >= session->window_count) {
-        session->current_window = 0;
-      }
-      calculate_layout(&session->windows[session->current_window]);
-      dirty = true;
-    } else if (strcmp(cmd, "Prev") == 0) {
-      Session *session = &neotmux->sessions[neotmux->current_session];
-      session->current_window--;
-      if (session->current_window < 0) {
-        session->current_window = session->window_count - 1;
-      }
-      calculate_layout(&session->windows[session->current_window]);
-      dirty = true;
-    } else if (strcmp(cmd, "Left") == 0) {
-      w->current_pane = move_active_pane(LEFT, w);
-      dirty = true;
-    } else if (strcmp(cmd, "Right") == 0) {
-      w->current_pane = move_active_pane(RIGHT, w);
-      dirty = true;
-    } else if (strcmp(cmd, "Up") == 0) {
-      w->current_pane = move_active_pane(UP, w);
-      dirty = true;
-    } else if (strcmp(cmd, "Down") == 0) {
-      w->current_pane = move_active_pane(DOWN, w);
-      dirty = true;
-    } else if (strcmp(cmd, "Even_Horizontal") == 0) {
-      printf("Even Horizontal\n");
-      w->layout = LAYOUT_EVEN_HORIZONTAL;
-      calculate_layout(w);
-      dirty = true;
-    } else if (strcmp(cmd, "Even_Vertical") == 0) {
-      printf("Even Vertical\n");
-      w->layout = LAYOUT_EVEN_VERTICAL;
-      calculate_layout(w);
-      dirty = true;
-    } else if (strcmp(cmd, "Main_Horizontal") == 0) {
-      printf("Main Horizontal\n");
-      w->layout = LAYOUT_MAIN_HORIZONTAL;
-      calculate_layout(w);
-      dirty = true;
-    } else if (strcmp(cmd, "Main_Vertical") == 0) {
-      printf("Main Vertical\n");
-      w->layout = LAYOUT_MAIN_VERTICAL;
-      calculate_layout(w);
-      dirty = true;
-    } else if (strcmp(cmd, "Tiled") == 0) {
-      printf("Tiled\n");
-      w->layout = LAYOUT_TILED;
-      calculate_layout(w);
-      dirty = true;
-    } else if (strcmp(cmd, "Custom") == 0) {
-      printf("Custom\n");
-      w->layout = LAYOUT_CUSTOM;
-      calculate_layout(w);
-      dirty = true;
-    } else if (strcmp(cmd, "Zoom") == 0) {
-      if (w->zoom == -1) {
-        w->zoom = w->current_pane;
-      } else {
-        w->zoom = -1;
-      }
-      calculate_layout(w);
-      dirty = true;
-    } else if (strcmp(cmd, "ScrollUp") == 0) {
-      printf("Scroll Up\n");
-      Pane *p = &w->panes[w->current_pane];
-      vterm_keyboard_unichar(p->process.vt, VTERM_KEY_UP, 0);
-      dirty = true;
-    } else if (strcmp(cmd, "ScrollDown") == 0) {
-      printf("Scroll Down\n");
-      Pane *p = &w->panes[w->current_pane];
-      vterm_keyboard_unichar(p->process.vt, VTERM_KEY_DOWN, 0);
-      dirty = true;
-    } else if (memcmp(cmd, "RenameWindow", 12) == 0) {
-      printf("Rename Window\n");
-      Window *window = &session->windows[session->current_window];
-      free(window->title);
-      char *title = strdup(cmd + 13);
-      window->title = title;
-      dirty = true;
-    } else if (memcmp(cmd, "RenameSession", 13) == 0) {
-      printf("Rename Session\n");
-      Session *session = &neotmux->sessions[neotmux->current_session];
-      free(session->title);
-      char *title = strdup(cmd + 14);
-      session->title = title;
-      dirty = true;
-    } else if (strcmp(cmd, "Reload") == 0) {
-      printf("Reloading (%d)\n", socket);
-      fflush(stdout);
-      close(socket);
-      exit(EXIT_SUCCESS);
-    } else {
-      printf("Unhandled command (%d): %s\n", socket, cmd);
-      fflush(stdout);
-    }
-  } else {
-    printf("Unhandled input (%d)\n", socket);
-    fflush(stdout);
-  }
-
-  return true;
 }
 
 void reorder_windows() {
@@ -326,29 +120,77 @@ void reorder_panes(Window *w) {
   if (w->pane_count == 0) {
     delete_window(w);
   }
+  calculate_layout(w);
+}
+
+// TODO: Rework this code
+// All possible inputs should have an associated message
+bool handle_input(int socket, char *buf, int read_size) {
+  if (read_size == 0) { // Client disconnected
+    printf("Client disconnected (%d)\n", socket);
+    die(NULL);
+    return false;
+  } else if (read_size == -1) { // Error
+    printf("Error reading from client (%d)\n", socket);
+    die(NULL);
+    return false;
+  } else if (buf[0] == 's') { // Size
+    uint32_t width;
+    uint32_t height;
+    memcpy(&width, buf + 1, sizeof(uint32_t));
+    memcpy(&height, buf + 5, sizeof(uint32_t));
+    printf("Size (%d): %d, %d\n", socket, width, height);
+    Session *session = &neotmux->sessions[neotmux->current_session];
+    Window *window = &session->windows[session->current_window];
+    window->width = width;
+    window->height = height;
+    reorder_panes(window);
+    dirty = true;
+  } else if (buf[0] == 'e') { // Event
+    if (read_size > 7) {
+      read_size = 7; // TODO: Fix this
+    }
+
+    printf("Received (%d):", socket);
+    for (int i = 1; i < read_size; i++) {
+      if (isprint(buf[i])) {
+        printf(" (%d, %c)", buf[i], buf[i]);
+      } else {
+        printf(" (%d)", buf[i]);
+      }
+    }
+    printf("\n");
+    fflush(stdout);
+
+    if (read_size == 7 && buf[1] == '\033' && buf[2] == '[' && buf[3] == 'M') {
+      if (handle_mouse(socket, buf, read_size)) {
+        dirty = true;
+      }
+    } else {
+      Session *session = &neotmux->sessions[neotmux->current_session];
+      Window *w = &session->windows[session->current_window];
+      Pane *p = &w->panes[w->current_pane];
+      int fd = p->process.fd;
+      write(fd, buf + 1, read_size - 1);
+    }
+  } else if (buf[0] == 'c') { // Command
+    handle_command(socket, buf, read_size);
+    dirty = true;
+  } else {
+    printf("Unhandled input (%d)\n", socket);
+    fflush(stdout);
+  }
+
+  return true;
 }
 
 void *handle_client(void *socket_desc) {
-  static bool initialized = false;
-  if (!initialized) {
-    initialized = true;
-    Session *s = add_session(neotmux, "Main");
-    Window *w = add_window(s, "Main");
-    for (int i = 0; i < 3; i++) {
-      add_pane(w);
-    }
-  }
-
   int socket = *(int *)socket_desc;
   int frame = 0;
 
-  pthread_mutex_lock(&neotmux->mutex);
   printf("Client connected (%d)\n", socket);
-  Session *session = &neotmux->sessions[neotmux->current_session];
-  Window *w = &session->windows[session->current_window];
-  render_screen(socket, w->height, w->width);
-  render_bar(socket, w->height, w->width);
-  pthread_mutex_unlock(&neotmux->mutex);
+
+  handle_input(socket, "cInit", 5);
 
   while (1) {
     int sixty_fps = 1000000 / 60;
@@ -410,7 +252,6 @@ void *handle_client(void *socket_desc) {
             p->process.closed = true;
             printf("Process closed (%d)\n", p->process.fd);
             reorder_panes(w);
-            calculate_layout(w);
             continue;
           }
           vterm_input_write(p->process.vt, buf, read_size);
@@ -431,9 +272,8 @@ void *handle_client(void *socket_desc) {
       if (dirty) {
         Session *session = &neotmux->sessions[neotmux->current_session];
         if (session->window_count == 0) {
-          printf("No windows\n");
           send(socket, "e", 1, 0);
-          handle_ctrl_c(0); // TODO: This is a hack
+          die("No windows");
         }
         Window *w = &session->windows[session->current_window];
         render_screen(socket, w->height, w->width);
@@ -441,6 +281,8 @@ void *handle_client(void *socket_desc) {
         dirty = false;
       }
       if (frame % 60 == 0) {
+        Session *session = &neotmux->sessions[neotmux->current_session];
+        Window *w = &session->windows[session->current_window];
         render_bar(socket, w->height, w->width);
       }
       frame++;
@@ -488,13 +330,13 @@ int start_server(int port) {
   signal(SIGINT, handle_ctrl_c);
 
   int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
-  ctrl_c_socket_desc = socket_desc;
+  die_socket_desc = socket_desc;
   if (socket_desc == -1) {
     printf("Could not create socket");
     return EXIT_FAILURE;
   }
 
-  struct sockaddr_in server = setup_server(socket_desc, port);
+  setup_server(socket_desc, port);
   while (1) {
     wait_for_connections(socket_desc);
     struct sockaddr_in client;

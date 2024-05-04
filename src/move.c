@@ -1,10 +1,8 @@
 #include "move.h"
 #include "session.h"
 
-int is_within_rect(VTermRect r, VTermPos p) {
-  return p.row >= r.start_row && p.row < r.end_row && p.col >= r.start_col &&
-         p.col < r.end_col;
-}
+#define is_within_rect(r, p) \
+  (p.row >= r.start_row && p.row < r.end_row && p.col >= r.start_col && p.col < r.end_col)
 
 int move_left(Window *w) {
   Pane *currentPane = &w->panes[w->current_pane];

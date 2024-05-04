@@ -43,7 +43,6 @@ int handle_term_prop(VTermProp prop, VTermValue *val, void *user) {
 
 int handle_push_line(int cols, const VTermScreenCell *cells, void *user) {
   // TODO: Copy these lines into scrollback buffer
-  Pane *pane = (Pane *)user;
   printf("Cols: %d\n", cols);
   for (int i = 0; i < cols; i++) {
     printf("%c", cells[i].chars[0]);

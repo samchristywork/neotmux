@@ -7,7 +7,6 @@
 
 #include "render_cell.h"
 #include "session.h"
-#include "statusbar.h"
 
 extern Neotmux *neotmux;
 
@@ -23,17 +22,14 @@ typedef struct FloatingWindow {
 
 FloatingWindow *floatingWindow = NULL;
 
-bool is_in_rect(int row, int col, int rowRect, int colRect, int height,
-                int width) {
-  return row >= rowRect && row < rowRect + height && col >= colRect &&
-         col < colRect + width;
-}
+#define is_in_rect(row, col, rowRect, colRect, height, width)                  \
+  (row >= rowRect && row < rowRect + height && col >= colRect &&               \
+   col < colRect + width)
 
-void write_position(int row, int col) {
-  char buf[32];
-  int n = snprintf(buf, 32, "\033[%d;%dH", row, col);
+#define write_position(row, col)                                               \
+  char buf[32];                                                                \
+  int n = snprintf(buf, 32, "\033[%d;%dH", row, col);                          \
   buf_write(buf, n);
-}
 
 void clear_style() {
   bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));
@@ -63,21 +59,6 @@ bool is_border(int row, int col, Window *window) {
   }
 
   return true;
-}
-
-bool is_bordering_active_pane(int row, int col, Window *window) {
-  Pane *pane = &window->panes[window->current_pane];
-
-  for (int x = -1; x <= 1; x++) {
-    for (int y = -1; y <= 1; y++) {
-      if (is_in_rect(row, col, pane->row + y, pane->col + x, pane->height,
-                     pane->width)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
 }
 
 bool is_in_pane(int row, int col, Window *window) {
@@ -126,54 +107,6 @@ void write_border_character(int row, int col, Window *window) {
     buf_write("─", 3);
   } else {
     buf_write(" ", 1);
-  }
-}
-
-void write_cursor_position() {
-  VTermPos cursorPos;
-  Session *currentSession = &neotmux->sessions[neotmux->current_session];
-  Window *currentWindow =
-      &currentSession->windows[currentSession->current_window];
-  if (currentWindow->current_pane != -1) {
-    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
-    VTermState *state = vterm_obtain_state(currentPane->process.vt);
-    vterm_state_get_cursorpos(state, &cursorPos);
-    cursorPos.row += currentPane->row;
-    cursorPos.col += currentPane->col;
-
-    if (neotmux->barPos == BAR_TOP) {
-      cursorPos.row++;
-    }
-
-    write_position(cursorPos.row + 1, cursorPos.col + 1);
-  }
-}
-
-void write_cursor_style() {
-  Session *currentSession = &neotmux->sessions[neotmux->current_session];
-  Window *currentWindow =
-      &currentSession->windows[currentSession->current_window];
-  if (currentWindow->current_pane != -1) {
-    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
-    if (currentPane->process.cursor_visible) {
-      buf_write("\033[?25h", 6); // Show cursor
-    } else {
-      buf_write("\033[?25l", 6); // Hide cursor
-    }
-
-    switch (currentPane->process.cursor_shape) {
-    case VTERM_PROP_CURSORSHAPE_BLOCK:
-      buf_write("\033[0 q", 6); // Block cursor
-      break;
-    case VTERM_PROP_CURSORSHAPE_UNDERLINE:
-      buf_write("\033[3 q", 6); // Underline cursor
-      break;
-    case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
-      buf_write("\033[5 q", 6); // Vertical bar cursor
-      break;
-    default:
-      break;
-    }
   }
 }
 
@@ -248,23 +181,6 @@ char *read_file(const char *filename) {
   buffer[length] = '\0';
 
   return buffer;
-}
-
-void render_bar(int fd, int rows, int cols) {
-  neotmux->bb.n = 0;
-
-  if (neotmux->barPos == BAR_TOP) {
-    write_position(1, 1);
-    write_status_bar(cols);
-  } else if (neotmux->barPos == BAR_BOTTOM) {
-    write_position(rows + 1, 1);
-    write_status_bar(cols);
-  }
-
-  write_cursor_position();
-  write_cursor_style();
-
-  write(fd, neotmux->bb.buffer, neotmux->bb.n);
 }
 
 void render_screen(int fd, int rows, int cols) {

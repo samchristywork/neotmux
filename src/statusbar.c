@@ -1,6 +1,6 @@
 #include <stdio.h>
+#include <unistd.h>
 
-#include "lua.h"
 #include "session.h"
 
 extern Neotmux *neotmux;
@@ -17,6 +17,19 @@ int calculate_printed_width(char *str) {
     }
   }
   return width;
+}
+
+// TODO: Rework
+int get_lua_int(lua_State *L, const char *name) {
+  lua_getglobal(L, name);
+  if (lua_isnumber(L, -1)) {
+    int value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    return value;
+  } else {
+    lua_pop(L, 1);
+    return -1;
+  }
 }
 
 // TODO: Handle overflow condition
@@ -84,4 +97,74 @@ void write_status_bar(int cols) {
   buf_write(statusRight, strlen(statusRight));
   buf_write("\033[0m", 4);
   free(statusRight);
+}
+
+#define write_position(row, col)                                               \
+  char buf[32];                                                                \
+  int n = snprintf(buf, 32, "\033[%d;%dH", row, col);                          \
+  buf_write(buf, n);
+
+void write_cursor_position() {
+  VTermPos cursorPos;
+  Session *currentSession = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow =
+      &currentSession->windows[currentSession->current_window];
+  if (currentWindow->current_pane != -1) {
+    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
+    VTermState *state = vterm_obtain_state(currentPane->process.vt);
+    vterm_state_get_cursorpos(state, &cursorPos);
+    cursorPos.row += currentPane->row;
+    cursorPos.col += currentPane->col;
+
+    if (neotmux->barPos == BAR_TOP) {
+      cursorPos.row++;
+    }
+
+    write_position(cursorPos.row + 1, cursorPos.col + 1);
+  }
+}
+
+void write_cursor_style() {
+  Session *currentSession = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow =
+      &currentSession->windows[currentSession->current_window];
+  if (currentWindow->current_pane != -1) {
+    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
+    if (currentPane->process.cursor_visible) {
+      buf_write("\033[?25h", 6); // Show cursor
+    } else {
+      buf_write("\033[?25l", 6); // Hide cursor
+    }
+
+    switch (currentPane->process.cursor_shape) {
+    case VTERM_PROP_CURSORSHAPE_BLOCK:
+      buf_write("\033[0 q", 6); // Block cursor
+      break;
+    case VTERM_PROP_CURSORSHAPE_UNDERLINE:
+      buf_write("\033[3 q", 6); // Underline cursor
+      break;
+    case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
+      buf_write("\033[5 q", 6); // Vertical bar cursor
+      break;
+    default:
+      break;
+    }
+  }
+}
+
+void render_bar(int fd, int rows, int cols) {
+  neotmux->bb.n = 0;
+
+  if (neotmux->barPos == BAR_TOP) {
+    write_position(1, 1);
+    write_status_bar(cols);
+  } else if (neotmux->barPos == BAR_BOTTOM) {
+    write_position(rows + 1, 1);
+    write_status_bar(cols);
+  }
+
+  write_cursor_position();
+  write_cursor_style();
+
+  write(fd, neotmux->bb.buffer, neotmux->bb.n);
 }

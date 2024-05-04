@@ -188,7 +188,6 @@ void handle_events(int sock) {
         reset_mode();
         struct winsize ws;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-        uint32_t width = ws.ws_col;
         uint32_t height = ws.ws_row;
 
         printf("\033[%d;1H", height);
@@ -207,7 +206,6 @@ void handle_events(int sock) {
         reset_mode();
         struct winsize ws;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-        uint32_t width = ws.ws_col;
         uint32_t height = ws.ws_row;
 
         printf("\033[%d;1H", height);
@@ -225,7 +223,6 @@ void handle_events(int sock) {
         reset_mode();
         struct winsize ws;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-        uint32_t width = ws.ws_col;
         uint32_t height = ws.ws_row;
 
         printf("\033[%d;1H", height);
