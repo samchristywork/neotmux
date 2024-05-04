@@ -6,22 +6,22 @@
 
 extern Neotmux *neotmux;
 
-bool get_lua_boolean(lua_State *L, const char *name) {
+bool get_lua_boolean(lua_State *L, const char *name, bool default_value) {
   lua_getglobal(L, name);
   if (!lua_isboolean(L, -1)) {
     lua_pop(L, 1);
-    return false;
+    return default_value;
   }
   bool result = lua_toboolean(L, -1);
   lua_pop(L, 1);
   return result;
 }
 
-char *get_lua_string(lua_State *L, const char *name) {
+char *get_lua_string(lua_State *L, const char *name, char *default_value) {
   lua_getglobal(L, name);
   if (!lua_isstring(L, -1)) {
     lua_pop(L, 1);
-    return NULL;
+    return default_value;
   }
   char *result = strdup(lua_tostring(L, -1));
   lua_pop(L, 1);
@@ -78,7 +78,7 @@ void initialize_vterm_instance(VTerm **vt, VTermScreen **vts, int h, int w,
 }
 
 void add_process_to_pane(Pane *pane) {
-  bool keepDir = get_lua_boolean(neotmux->lua, "keep_dir");
+  bool keepDir = get_lua_boolean(neotmux->lua, "keep_dir", false);
   struct winsize ws = {0};
   ws.ws_col = pane->width;
   ws.ws_row = pane->height;
@@ -105,7 +105,7 @@ void add_process_to_pane(Pane *pane) {
       }
     }
 
-    char *shell = get_lua_string(neotmux->lua, "shell");
+    char *shell = get_lua_string(neotmux->lua, "shell", NULL);
     if (!shell) {
       shell = getenv("SHELL");
     }

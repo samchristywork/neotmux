@@ -19,19 +19,6 @@ int calculate_printed_width(char *str) {
   return width;
 }
 
-// TODO: Rework
-int get_lua_int(lua_State *L, const char *name) {
-  lua_getglobal(L, name);
-  if (lua_isnumber(L, -1)) {
-    int value = lua_tointeger(L, -1);
-    lua_pop(L, 1);
-    return value;
-  } else {
-    lua_pop(L, 1);
-    return -1;
-  }
-}
-
 // TODO: Handle overflow condition
 void write_status_bar(int cols) {
   int width = 0;
@@ -41,9 +28,11 @@ void write_status_bar(int cols) {
   buf_write("\033[7m", 4); // Invert colors
   static int bar_color = -1;
   if (bar_color == -1) {
-    bar_color = get_lua_int(neotmux->lua, "bar_color");
-    if (bar_color == 0) {
-      bar_color = 4;
+    lua_getglobal(neotmux->lua, "bar_color");
+    if (lua_isnumber(neotmux->lua, -1)) {
+      bar_color = lua_tointeger(neotmux->lua, -1);
+    } else {
+      bar_color = 0;
     }
   }
   buf_color(bar_color);
@@ -152,8 +141,14 @@ void write_cursor_style() {
   }
 }
 
-void render_bar(int fd, int rows, int cols) {
+void render_bar(int fd) {
   neotmux->bb.n = 0;
+
+  Session *currentSession = &neotmux->sessions[neotmux->current_session];
+  Window *currentWindow =
+      &currentSession->windows[currentSession->current_window];
+  int cols = currentWindow->width;
+  int rows = currentWindow->height;
 
   if (neotmux->barPos == BAR_TOP) {
     write_position(1, 1);

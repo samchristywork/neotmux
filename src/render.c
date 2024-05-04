@@ -31,6 +31,10 @@ FloatingWindow *floatingWindow = NULL;
   int n = snprintf(buf, 32, "\033[%d;%dH", row, col);                          \
   buf_write(buf, n);
 
+void draw_cell(VTermScreenCell cell) {
+  render_cell(cell);
+}
+
 void clear_style() {
   bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));
   buf_write("\033[0m", 4); // Reset style
@@ -122,7 +126,7 @@ void draw_pane(Pane *pane, Window *window) {
 
       VTermScreenCell cell = {0};
       vterm_screen_get_cell(vts, pos, &cell);
-      render_cell(cell);
+      draw_cell(cell);
     }
   }
 }
@@ -153,7 +157,7 @@ void draw_floating_window(FloatingWindow *floatingWindow, Window *window) {
           vterm_screen_get_cell(vts, pos, &cell);
           cell.bg.type = VTERM_COLOR_INDEXED;
           cell.bg.indexed.idx = 8;
-          render_cell(cell);
+          draw_cell(cell);
         }
       }
     }
@@ -183,7 +187,7 @@ char *read_file(const char *filename) {
   return buffer;
 }
 
-void render_screen(int fd, int rows, int cols) {
+void render_screen(int fd) {
   if (!floatingWindow) {
     floatingWindow = malloc(sizeof(FloatingWindow));
     floatingWindow->height = 43;

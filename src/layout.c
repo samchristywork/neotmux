@@ -31,22 +31,21 @@ bool call_lua_layout_function(lua_State *L, const char *function, int *col,
   return true;
 }
 
-void update_layout(Window *w) {
-  for (int i = 0; i < w->pane_count; i++) {
-    vterm_set_size(w->panes[i].process.vt, w->panes[i].height,
-                   w->panes[i].width);
-
-    struct winsize ws;
-    ws.ws_row = w->panes[i].height;
-    ws.ws_col = w->panes[i].width;
-    ws.ws_xpixel = 0;
-    ws.ws_ypixel = 0;
-
-    if (ioctl(w->panes[i].process.fd, TIOCSWINSZ, &ws) < 0) {
-      exit(EXIT_FAILURE);
-    }
+#define update_layout(w)                                                       \
+  for (int i = 0; i < w->pane_count; i++) {                                    \
+    vterm_set_size(w->panes[i].process.vt, w->panes[i].height,                 \
+                   w->panes[i].width);                                         \
+                                                                               \
+    struct winsize ws;                                                         \
+    ws.ws_row = w->panes[i].height;                                            \
+    ws.ws_col = w->panes[i].width;                                             \
+    ws.ws_xpixel = 0;                                                          \
+    ws.ws_ypixel = 0;                                                          \
+                                                                               \
+    if (ioctl(w->panes[i].process.fd, TIOCSWINSZ, &ws) < 0) {                  \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
   }
-}
 
 void apply_even_horizontal_layout(Window *w) {
   Pane *panes = w->panes;

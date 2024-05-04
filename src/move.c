@@ -112,7 +112,7 @@ int move_down(Window *w) {
   }
 }
 
-int move_active_pane(int d, Window *w) {
+int move_active_pane(Direction d, Window *w) {
   switch (d) {
   case LEFT:
     return move_left(w);

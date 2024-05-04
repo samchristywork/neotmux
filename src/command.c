@@ -4,9 +4,11 @@
 
 #include "layout.h"
 #include "move.h"
-#include "print_session.h"
 #include "pane.h"
+#include "print_session.h"
+#include "render.h"
 #include "session.h"
+#include "statusbar.h"
 
 extern Neotmux *neotmux;
 
@@ -97,6 +99,12 @@ void handle_command(int socket, char *buf, int read_size) {
     window->height = w->height;
     add_pane(window);
     session->current_window = session->window_count - 1;
+    calculate_layout(&session->windows[session->current_window]);
+  } else if (strcmp(cmd, "RenderScreen") == 0) {
+    render_screen(socket);
+  } else if (strcmp(cmd, "RenderBar") == 0) {
+    render_bar(socket);
+  } else if (strcmp(cmd, "Layout") == 0) {
     calculate_layout(&session->windows[session->current_window]);
   } else if (strcmp(cmd, "VSplit") == 0) {
     add_pane(w);

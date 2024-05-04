@@ -1,21 +1,27 @@
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <lua5.4/lauxlib.h>
 #include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "command.h"
-#include "layout.h"
 #include "mouse.h"
 #include "plugin.h"
-#include "render.h"
+#include "session.h"
 
 bool dirty = true; // TODO: Dirty should be on a per-pane basis
 Neotmux *neotmux;
+
+void run_command(int socket, char *buf, int read_size) {
+  handle_command(socket, buf, read_size);
+}
 
 // Read a u32 representing the size of the message followed by the message
 ssize_t read_message(int sock, char *buf, size_t len) {
@@ -97,7 +103,9 @@ void delete_window(Window *w) {
   reorder_windows();
 }
 
-void reorder_panes(Window *w) {
+bool handle_input(int socket, char *buf, int read_size);
+
+void reorder_panes(int socket, Window *w) {
   printf("Reordering panes\n");
   for (int i = 0; i < w->pane_count; i++) {
     Pane *p = &w->panes[i];
@@ -120,7 +128,8 @@ void reorder_panes(Window *w) {
   if (w->pane_count == 0) {
     delete_window(w);
   }
-  calculate_layout(w);
+
+  handle_input(socket, "cLayout", 7);
 }
 
 // TODO: Rework this code
@@ -144,7 +153,7 @@ bool handle_input(int socket, char *buf, int read_size) {
     Window *window = &session->windows[session->current_window];
     window->width = width;
     window->height = height;
-    reorder_panes(window);
+    reorder_panes(socket, window);
     dirty = true;
   } else if (buf[0] == 'e') { // Event
     if (read_size > 7) {
@@ -174,7 +183,7 @@ bool handle_input(int socket, char *buf, int read_size) {
       write(fd, buf + 1, read_size - 1);
     }
   } else if (buf[0] == 'c') { // Command
-    handle_command(socket, buf, read_size);
+    run_command(socket, buf, read_size);
     dirty = true;
   } else {
     printf("Unhandled input (%d)\n", socket);
@@ -251,7 +260,7 @@ void *handle_client(void *socket_desc) {
           } else if (read_size == -1) {
             p->process.closed = true;
             printf("Process closed (%d)\n", p->process.fd);
-            reorder_panes(w);
+            reorder_panes(socket, w);
             continue;
           }
           vterm_input_write(p->process.vt, buf, read_size);
@@ -275,15 +284,12 @@ void *handle_client(void *socket_desc) {
           send(socket, "e", 1, 0);
           die("No windows");
         }
-        Window *w = &session->windows[session->current_window];
-        render_screen(socket, w->height, w->width);
-        render_bar(socket, w->height, w->width);
+        run_command(socket, "cRenderScreen", 13);
+        run_command(socket, "cRenderBar", 10);
         dirty = false;
       }
       if (frame % 60 == 0) {
-        Session *session = &neotmux->sessions[neotmux->current_session];
-        Window *w = &session->windows[session->current_window];
-        render_bar(socket, w->height, w->width);
+        run_command(socket, "cRenderBar", 10);
       }
       frame++;
     }
@@ -313,17 +319,42 @@ int start_server(int port) {
   char dotfile[PATH_MAX];
   snprintf(dotfile, PATH_MAX, "%s/.ntmux.lua", home);
 
-  if (!execute_lua_file(neotmux->lua, "lua/default.lua")) {
+  if (!load_plugin(neotmux->lua, "lua/default.lua")) {
     return EXIT_FAILURE;
   }
 
-  load_plugins(neotmux->lua);
+  {
+    printf("Loading plugins\n");
+    char *home = getenv("HOME");
+    char plugins[PATH_MAX];
+    snprintf(plugins, PATH_MAX, "%s/.ntmux/plugins", home);
 
-  if (!execute_lua_file(neotmux->lua, dotfile)) {
+    DIR *dir = opendir(plugins);
+    if (dir) {
+      struct dirent *entry;
+      while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type == DT_DIR && entry->d_name[0] != '.') {
+          printf("Loading plugin: %s\n", entry->d_name);
+          size_t size = strlen(plugins) + strlen(entry->d_name) + 11;
+          if (size > PATH_MAX) {
+            fprintf(stderr, "Path too long\n");
+            continue;
+          }
+          char path[size];
+          snprintf(path, size, "%s/%s/init.lua", plugins, entry->d_name);
+          load_plugin(neotmux->lua, path);
+        }
+      }
+
+      closedir(dir);
+    }
+  }
+
+  if (!load_plugin(neotmux->lua, dotfile)) {
     return EXIT_FAILURE;
   }
 
-  if (!execute_lua_file(neotmux->lua, "lua/init.lua")) {
+  if (!load_plugin(neotmux->lua, "lua/init.lua")) {
     return EXIT_FAILURE;
   }
 
