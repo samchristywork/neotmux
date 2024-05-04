@@ -2,11 +2,9 @@
 #include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
 #include <stdio.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
-#include "lua.h"
 #include "render_cell.h"
 #include "session.h"
 #include "statusbar.h"
@@ -50,6 +48,20 @@ bool is_border(int row, int col, Window *window) {
     }
   }
 
+  bool outsideAllPanes = true;
+  for (int i = 0; i < window->pane_count; i++) {
+    Pane *pane = &window->panes[i];
+    if (is_in_rect(row, col, pane->row - 1, pane->col - 1, pane->height + 2,
+                   pane->width + 2)) {
+      outsideAllPanes = false;
+      break;
+    }
+  }
+
+  if (outsideAllPanes) {
+    return false;
+  }
+
   return true;
 }
 
@@ -68,7 +80,23 @@ bool is_bordering_active_pane(int row, int col, Window *window) {
   return false;
 }
 
+bool is_in_pane(int row, int col, Window *window) {
+  for (int i = 0; i < window->pane_count; i++) {
+    Pane *pane = &window->panes[i];
+    if (is_in_rect(row, col, pane->row, pane->col, pane->height, pane->width)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void write_border_character(int row, int col, Window *window) {
+  if (is_in_pane(row, col, window)) {
+    buf_write("\033[1C", 4);
+    return;
+  }
+
   bool r = is_border(row, col + 1, window);
   bool l = is_border(row, col - 1, window);
   bool d = is_border(row + 1, col, window);
@@ -137,10 +165,15 @@ void render_screen(int fd, int rows, int cols) {
 
   neotmux->bb.n = 0;
 
-  buf_write("\033[H", 3); // Move cursor to top left
-  if (barPos == BAR_TOP) {
-    buf_write("\r\n", 2);
+void draw_borders(Window *window) {
+  buf_color(2);
+  for (int row = 0; row < window->height; row++) {
+    write_position(row + 1, 1);
+    for (int col = 0; col < window->width; col++) {
+      write_border_character(row, col, window);
+    }
   }
+}
 
 void draw_floating_window(FloatingWindow *floatingWindow, Window *window) {
   if (floatingWindow->visible) {
@@ -162,11 +195,34 @@ void draw_floating_window(FloatingWindow *floatingWindow, Window *window) {
         }
       }
     }
-    if (row < rows - 1) {
-      clear_style();
-      buf_write("\r\n", 2);
-    }
   }
+}
+
+char *read_file(const char *filename) {
+  FILE *file = fopen(filename, "r");
+  if (!file) {
+    return NULL;
+  }
+
+  fseek(file, 0, SEEK_END);
+  long length = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  char *buffer = malloc(length + 1);
+  if (!buffer) {
+    fclose(file);
+    return NULL;
+  }
+
+  fread(buffer, 1, length, file);
+  fclose(file);
+  buffer[length] = '\0';
+
+  return buffer;
+}
+
+void render_bar(int fd, int rows, int cols) {
+  neotmux->bb.n = 0;
 
   // TODO: This should be done asynchronously
   if (barPos == BAR_TOP) {
@@ -238,30 +294,25 @@ void render_screen(int fd, int rows, int cols) {
     }
   }
 
+  if (neotmux->bb.buffer == NULL) {
+    neotmux->bb.buffer = malloc(100);
+    neotmux->bb.capacity = 100;
+  }
+
+  neotmux->bb.n = 0;
+
   Session *currentSession = &neotmux->sessions[neotmux->current_session];
   Window *currentWindow =
       &currentSession->windows[currentSession->current_window];
-  if (currentWindow->current_pane != -1) {
-    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
-    if (currentPane->process.cursor_visible) {
-      buf_write("\033[?25h", 6); // Show cursor
-    } else {
-      buf_write("\033[?25l", 6); // Hide cursor
+  if (currentWindow->zoom != -1) {
+    Pane *pane = &currentWindow->panes[currentWindow->zoom];
+    draw_pane(pane, currentWindow);
+  } else {
+    for (int k = 0; k < currentWindow->pane_count; k++) {
+      Pane *pane = &currentWindow->panes[k];
+      draw_pane(pane, currentWindow);
     }
-
-    switch (currentPane->process.cursor_shape) {
-    case VTERM_PROP_CURSORSHAPE_BLOCK:
-      buf_write("\033[0 q", 6); // Block cursor
-      break;
-    case VTERM_PROP_CURSORSHAPE_UNDERLINE:
-      buf_write("\033[3 q", 6); // Underline cursor
-      break;
-    case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
-      buf_write("\033[5 q", 6); // Vertical bar cursor
-      break;
-    default:
-      break;
-    }
+    draw_borders(currentWindow);
   }
 
   draw_floating_window(floatingWindow, currentWindow);
