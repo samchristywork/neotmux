@@ -41,14 +41,14 @@ int handle_term_prop(VTermProp prop, VTermValue *val, void *user) {
   return 0;
 }
 
-int push_line_callback(int cols, const VTermScreenCell *cells, void *user) {
+int handle_push_line(int cols, const VTermScreenCell *cells, void *user) {
   // TODO: Copy these lines into scrollback buffer
-  // Pane *pane = (Pane *)user;
-  // printf("Cols: %d\n", cols);
-  // for (int i = 0; i < cols; i++) {
-  //  printf("%c", cells[i].chars[0]);
-  //}
-  // printf("\n");
+  Pane *pane = (Pane *)user;
+  printf("Cols: %d\n", cols);
+  for (int i = 0; i < cols; i++) {
+    printf("%c", cells[i].chars[0]);
+  }
+  printf("\n");
   return 0;
 }
 
@@ -69,8 +69,8 @@ void initialize_vterm_instance(VTerm **vt, VTermScreen **vts, int h, int w,
   callbacks.settermprop = handle_term_prop;
   callbacks.bell = NULL;
   callbacks.resize = NULL;
-  callbacks.sb_pushline = push_line_callback; // TODO: Use for scrolling
-  callbacks.sb_popline = NULL;                // TODO: Use for scrolling
+  callbacks.sb_pushline = handle_push_line; // TODO: Use for scrolling
+  callbacks.sb_popline = NULL;              // TODO: Use for scrolling
 
   vterm_set_utf8(*vt, 1);
   vterm_screen_reset(*vts, 1);

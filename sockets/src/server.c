@@ -165,6 +165,9 @@ bool handle_input(int socket, char *buf, int read_size) {
       calculate_layout(w);
       w->current_pane = w->pane_count - 1;
       dirty = true;
+    } else if (strcmp(cmd, "CycleStatus") == 0) {
+      neotmux->statusBarIdx++;
+      dirty = true;
     } else if (strcmp(cmd, "List") == 0) {
       print_sessions(neotmux);
     } else if (strcmp(cmd, "Next") == 0) {

@@ -5,7 +5,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -101,6 +100,21 @@ bool receive_message(int sock) {
   return true;
 }
 
+void send_size(int sock) {
+  struct winsize ws;
+  ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+  uint32_t width = ws.ws_col;
+  uint32_t height = ws.ws_row;
+  height--; // Make room for status bar
+
+  char buf[9];
+  bzero(buf, 9);
+  buf[0] = 's';
+  memcpy(buf + 1, &width, sizeof(uint32_t));
+  memcpy(buf + 5, &height, sizeof(uint32_t));
+  write_message(sock, buf, 9);
+}
+
 void handle_binding(int numRead, char *buf, int sock, char *command,
                     char *binding) {
   if (numRead == strlen(binding) &&
@@ -108,9 +122,6 @@ void handle_binding(int numRead, char *buf, int sock, char *command,
     write_message(sock, command, strlen(command));
   }
 }
-
-// TODO: Delete this
-void send_size(int sock);
 
 void handle_events(int sock) {
   enter_raw_mode();
@@ -149,6 +160,7 @@ void handle_events(int sock) {
       handle_binding(n, buf, sock, "cSplit", "\"");
       handle_binding(n, buf, sock, "cVSplit", "%");
       handle_binding(n, buf, sock, "cList", "i");
+      handle_binding(n, buf, sock, "cCycleStatus", "y");
       handle_binding(n, buf, sock, "cCreate", "e");
       handle_binding(n, buf, sock, "cReload", "r");
       handle_binding(n, buf, sock, "cLeft", "h");
@@ -255,22 +267,6 @@ void handle_events(int sock) {
   }
 
   reset_mode();
-}
-
-void send_size(int sock) {
-  struct winsize ws;
-  ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-  uint32_t width = ws.ws_col;
-  uint32_t height = ws.ws_row;
-  height--; // Make room for debug info bar
-  height--; // Make room for status bar
-
-  char buf[9];
-  bzero(buf, 9);
-  buf[0] = 's';
-  memcpy(buf + 1, &width, sizeof(uint32_t));
-  memcpy(buf + 5, &height, sizeof(uint32_t));
-  write_message(sock, buf, 9);
 }
 
 int resize_socket;

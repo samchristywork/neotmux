@@ -1,23 +1,11 @@
 #include <lua5.4/lauxlib.h>
 #include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
-#include <string.h>
 #include <vterm.h>
 
-#include "lua.h"
 #include "session.h"
 
 extern Neotmux *neotmux;
-
-#define buf_write2(buf, count)                                                 \
-  do {                                                                         \
-    if (neotmux->bb.n + count >= neotmux->bb.capacity) {                       \
-      neotmux->bb.capacity *= 2;                                               \
-      neotmux->bb.buffer = realloc(neotmux->bb.buffer, neotmux->bb.capacity);  \
-    }                                                                          \
-    memcpy(neotmux->bb.buffer + neotmux->bb.n, buf, count);                    \
-    neotmux->bb.n += count;                                                    \
-  } while (0)
 
 unsigned int calculate_utf8_length(long codepoint) {
   if (codepoint < 0x0000080) {
@@ -102,7 +90,7 @@ int has_lua_function(lua_State *L, const char *function) {
 void write_rgb_color(int red, int green, int blue, int type) {
   char buf[32];
   int n = snprintf(buf, 32, "\033[%d;2;%d;%d;%dm", type, red, green, blue);
-  buf_write2(buf, n);
+  buf_write(buf, n);
 }
 
 // TODO: Interpolate into rgb colors
@@ -132,51 +120,51 @@ void write_indexed_color(int idx, int type) {
 
   char buf[32];
   int n = snprintf(buf, 32, "\033[%d;5;%dm", type, idx);
-  buf_write2(buf, n);
+  buf_write(buf, n);
 }
 
 void render_cell(VTermScreenCell cell) {
   if (cell.attrs.bold != neotmux->prevCell.attrs.bold) {
     if (cell.attrs.bold) {
-      buf_write2("\033[1m", 4); // Enable bold
+      buf_write("\033[1m", 4); // Enable bold
     } else {
-      buf_write2("\033[22m", 5); // Disable bold
+      buf_write("\033[22m", 5); // Disable bold
     }
     neotmux->prevCell.attrs.bold = cell.attrs.bold;
   }
 
   if (cell.attrs.reverse != neotmux->prevCell.attrs.reverse) {
     if (cell.attrs.reverse) {
-      buf_write2("\033[7m", 4); // Enable reverse
+      buf_write("\033[7m", 4); // Enable reverse
     } else {
-      buf_write2("\033[27m", 5); // Disable reverse
+      buf_write("\033[27m", 5); // Disable reverse
     }
     neotmux->prevCell.attrs.reverse = cell.attrs.reverse;
   }
 
   if (cell.attrs.underline != neotmux->prevCell.attrs.underline) {
     if (cell.attrs.underline) {
-      buf_write2("\033[4m", 4); // Enable underline
+      buf_write("\033[4m", 4); // Enable underline
     } else {
-      buf_write2("\033[24m", 5); // Disable underline
+      buf_write("\033[24m", 5); // Disable underline
     }
     neotmux->prevCell.attrs.underline = cell.attrs.underline;
   }
 
   if (cell.attrs.italic != neotmux->prevCell.attrs.italic) {
     if (cell.attrs.italic) {
-      buf_write2("\033[3m", 4); // Enable italic
+      buf_write("\033[3m", 4); // Enable italic
     } else {
-      buf_write2("\033[23m", 5); // Disable italic
+      buf_write("\033[23m", 5); // Disable italic
     }
     neotmux->prevCell.attrs.italic = cell.attrs.italic;
   }
 
   if (cell.attrs.strike != neotmux->prevCell.attrs.strike) {
     if (cell.attrs.strike) {
-      buf_write2("\033[9m", 4); // Enable strike
+      buf_write("\033[9m", 4); // Enable strike
     } else {
-      buf_write2("\033[29m", 5); // Disable strike
+      buf_write("\033[29m", 5); // Disable strike
     }
     neotmux->prevCell.attrs.strike = cell.attrs.strike;
   }
@@ -202,13 +190,13 @@ void render_cell(VTermScreenCell cell) {
   }
 
   if (cell.chars[0] == 0) {
-    buf_write2(" ", 1);
+    buf_write(" ", 1);
   } else {
     for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i]; i++) {
       char bytes[6];
       int len = fill_utf8(cell.chars[i], bytes);
       bytes[len] = 0;
-      buf_write2(bytes, len);
+      buf_write(bytes, len);
     }
   }
 }
