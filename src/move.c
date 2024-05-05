@@ -1,127 +1,67 @@
+#include <lua5.4/lauxlib.h>
+#include <lua5.4/lua.h>
+#include <lua5.4/lualib.h>
+
 #include "move.h"
 #include "session.h"
 
-#define is_within_rect(r, p) \
-  (p.row >= r.start_row && p.row < r.end_row && p.col >= r.start_col && p.col < r.end_col)
+extern Neotmux *neotmux;
 
-int move_left(Window *w) {
-  Pane *currentPane = &w->panes[w->current_pane];
-  int col = currentPane->col;
-  int row = currentPane->row;
-  col--;
-
-  while (true) {
-    if (col < 0) {
-      col = w->width - 1;
-    }
-    for (int r = row; r < row + currentPane->height; r++) {
-      for (int i = 0; i < w->pane_count; i++) {
-        Pane *pane = &w->panes[i];
-        VTermRect rect = {.start_col = pane->col,
-                          .start_row = pane->row,
-                          .end_col = pane->col + pane->width,
-                          .end_row = pane->row + pane->height};
-        VTermPos pos = {.col = col, .row = r};
-        if (is_within_rect(rect, pos)) {
-          return i;
-        }
-      }
-    }
-    col--;
-  }
+void push_pane(lua_State *lua, Pane *pane) {
+  lua_newtable(lua);
+  lua_pushinteger(lua, pane->col);
+  lua_setfield(lua, -2, "col");
+  lua_pushinteger(lua, pane->row);
+  lua_setfield(lua, -2, "row");
+  lua_pushinteger(lua, pane->width);
+  lua_setfield(lua, -2, "width");
+  lua_pushinteger(lua, pane->height);
+  lua_setfield(lua, -2, "height");
 }
 
-int move_right(Window *w) {
+int call_lua_movement_function(char *functionName, Window *w) {
   Pane *currentPane = &w->panes[w->current_pane];
-  int col = currentPane->col;
-  int row = currentPane->row;
-  col += currentPane->width;
+  lua_State *lua = neotmux->lua;
+  lua_getglobal(lua, functionName);
 
-  while (true) {
-    if (col >= w->width) {
-      col = 0;
-    }
-    for (int r = row; r < row + currentPane->height; r++) {
-      for (int i = 0; i < w->pane_count; i++) {
-        Pane *pane = &w->panes[i];
-        VTermRect rect = {.start_col = pane->col,
-                          .start_row = pane->row,
-                          .end_col = pane->col + pane->width,
-                          .end_row = pane->row + pane->height};
-        VTermPos pos = {.col = col, .row = r};
-        if (is_within_rect(rect, pos)) {
-          return i;
-        }
-      }
-    }
-    col++;
+  // Pane
+  push_pane(lua, currentPane);
+
+  // Panes
+  lua_newtable(lua);
+  for (int i = 0; i < w->pane_count; i++) {
+    Pane *pane = &w->panes[i];
+    push_pane(lua, pane);
+    lua_rawseti(lua, -2, i + 1);
   }
-}
 
-int move_up(Window *w) {
-  Pane *currentPane = &w->panes[w->current_pane];
-  int col = currentPane->col;
-  int row = currentPane->row;
-  row--;
+  // Width
+  lua_pushinteger(lua, w->width);
 
-  while (true) {
-    if (row < 0) {
-      row = w->height - 1;
-    }
-    for (int c = col; c < col + currentPane->width; c++) {
-      for (int i = 0; i < w->pane_count; i++) {
-        Pane *pane = &w->panes[i];
-        VTermRect rect = {.start_col = pane->col,
-                          .start_row = pane->row,
-                          .end_col = pane->col + pane->width,
-                          .end_row = pane->row + pane->height};
-        VTermPos pos = {.col = c, .row = row};
-        if (is_within_rect(rect, pos)) {
-          return i;
-        }
-      }
-    }
-    row--;
-  }
-}
+  // Height
+  lua_pushinteger(lua, w->height);
 
-int move_down(Window *w) {
-  Pane *currentPane = &w->panes[w->current_pane];
-  int col = currentPane->col;
-  int row = currentPane->row;
-  row += currentPane->height;
+  lua_call(lua, 4, 1);
 
-  while (true) {
-    if (row >= w->height) {
-      row = 0;
-    }
-    for (int c = col; c < col + currentPane->width; c++) {
-      for (int i = 0; i < w->pane_count; i++) {
-        Pane *pane = &w->panes[i];
-        VTermRect rect = {.start_col = pane->col,
-                          .start_row = pane->row,
-                          .end_col = pane->col + pane->width,
-                          .end_row = pane->row + pane->height};
-        VTermPos pos = {.col = c, .row = row};
-        if (is_within_rect(rect, pos)) {
-          return i;
-        }
-      }
-    }
-    row++;
-  }
+  int returnValue = lua_tointeger(lua, -1);
+  lua_pop(lua, 1);
+  return returnValue;
 }
 
 int move_active_pane(Direction d, Window *w) {
   switch (d) {
-  case LEFT:
-    return move_left(w);
-  case RIGHT:
-    return move_right(w);
-  case UP:
-    return move_up(w);
-  case DOWN:
-    return move_down(w);
+  case LEFT: {
+    return call_lua_movement_function("handleLeft", w);
+  }
+  case RIGHT: {
+    return call_lua_movement_function("handleRight", w);
+  }
+  case UP: {
+    return call_lua_movement_function("handleUp", w);
+  }
+  case DOWN: {
+    return call_lua_movement_function("handleDown", w);
+  }
   default:
     return -1;
   }

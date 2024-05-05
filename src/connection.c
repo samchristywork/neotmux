@@ -1,13 +1,6 @@
 #include <arpa/inet.h>
-#include <dirent.h>
-#include <lua5.4/lauxlib.h>
-#include <lua5.4/lua.h>
-#include <lua5.4/lualib.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
-#include <unistd.h>
 
 int accept_connection(int socket_desc, struct sockaddr_in client) {
   int c = sizeof(struct sockaddr_in);
