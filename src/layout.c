@@ -195,6 +195,10 @@ void apply_custom_layout(Window *w) {
 }
 
 void calculate_layout(Window *window) {
+  if (!window) {
+    return;
+  }
+
   if (window->zoom != -1) {
     window->panes[window->zoom].row = 0;
     window->panes[window->zoom].col = 0;

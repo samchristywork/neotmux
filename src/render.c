@@ -74,6 +74,21 @@ bool is_in_pane(int row, int col, Window *window) {
   return false;
 }
 
+bool borders_active_pane(int row, int col, Window *window) {
+  for (int i = 0; i < window->pane_count; i++) {
+    Pane *pane = &window->panes[i];
+    if (window->current_pane == i) {
+      if (is_in_rect(row, col, pane->row - 1, pane->col - 1, pane->height + 2,
+                     pane->width + 2)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+int lastColor;
 void write_border_character(int row, int col, Window *window) {
   if (is_in_pane(row, col, window)) {
     buf_write("\033[1C", 4);
@@ -84,6 +99,18 @@ void write_border_character(int row, int col, Window *window) {
   bool l = is_border(row, col - 1, window);
   bool d = is_border(row + 1, col, window);
   bool u = is_border(row - 1, col, window);
+
+  if (u || d || l || r) {
+    if (borders_active_pane(row, col, window)) {
+      if (lastColor != 2) {
+        buf_color(2);
+      }
+    } else {
+      if (lastColor != 8) {
+        buf_color(8);
+      }
+    }
+  }
 
   if (u && d && l && r) {
     buf_write("┼", 3);
@@ -129,8 +156,9 @@ void draw_pane(Pane *pane, Window *window) {
   }
 }
 
+// TODO: Ensure that we color active borders
 void draw_borders(Window *window) {
-  buf_color(2);
+  lastColor = 0;
   for (int row = 0; row < window->height; row++) {
     write_position(row + 1, 1);
     for (int col = 0; col < window->width; col++) {
