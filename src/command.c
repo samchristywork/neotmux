@@ -73,19 +73,31 @@ void handle_command(int socket, char *buf, int read_size) {
   memcpy(cmd, buf + 1, read_size - 1);
   cmd[read_size - 1] = '\0';
 
+  printf("Command (%d): %s\n", socket, cmd);
+
   if (strcmp(cmd, "Init") == 0) {
     Session *s = add_session(neotmux, "Main");
     Window *w = add_window(s, "Main");
-    for (int i = 0; i < 3; i++) {
+
+    int initial_panes = 3;
+    lua_getglobal(neotmux->lua, "initial_panes");
+    if (lua_isnumber(neotmux->lua, -1)) {
+      initial_panes = lua_tonumber(neotmux->lua, -1);
+    }
+    lua_pop(neotmux->lua, 1);
+
+    for (int i = 0; i < initial_panes; i++) {
       add_pane(w);
     }
+    return;
   }
 
-  Session *session = &neotmux->sessions[neotmux->current_session];
-  Window *w = &session->windows[session->current_window];
-
   if (strcmp(cmd, "Create") == 0) {
-    Session *session = &neotmux->sessions[neotmux->current_session];
+    Session *session = get_current_session(neotmux);
+    if (session == NULL) {
+      return;
+    }
+
     Window *window;
 
     lua_getglobal(neotmux->lua, "default_title");
