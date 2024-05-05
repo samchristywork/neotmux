@@ -171,6 +171,9 @@ void render_cell(VTermScreenCell cell) {
 
   if (!compare_colors(cell.bg, neotmux->prevCell.bg)) {
     if (cell.bg.type == VTERM_COLOR_DEFAULT_BG) {
+      if (neotmux->prevCell.bg.type != VTERM_COLOR_DEFAULT_BG) {
+        buf_write("\033[49m", 5);
+      }
     } else if (VTERM_COLOR_IS_INDEXED(&cell.bg)) {
       write_indexed_color(cell.bg.indexed.idx, 48);
       neotmux->prevCell.bg = cell.bg;
@@ -178,6 +181,7 @@ void render_cell(VTermScreenCell cell) {
       write_rgb_color(cell.bg.rgb.red, cell.bg.rgb.green, cell.bg.rgb.blue, 48);
       neotmux->prevCell.bg = cell.bg;
     }
+    neotmux->prevCell.bg = cell.bg;
   }
 
   if (!compare_colors(cell.fg, neotmux->prevCell.fg)) {

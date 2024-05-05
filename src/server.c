@@ -158,6 +158,30 @@ bool handle_input(int socket, char *buf, int read_size) {
   return true;
 }
 
+bool check_timeout(int timeout) {
+  static struct timeval tv = {.tv_sec = 0, .tv_usec = 0};
+
+  struct timeval now;
+  gettimeofday(&now, NULL);
+
+  if (tv.tv_sec == 0 && tv.tv_usec == 0) {
+    tv = now;
+    return true;
+  }
+
+  if (now.tv_sec - tv.tv_sec > 0) {
+    tv = now;
+    return true;
+  }
+
+  if (now.tv_usec - tv.tv_usec > timeout) {
+    tv = now;
+    return true;
+  }
+
+  return false;
+}
+
 void *handle_client(void *socket_desc) {
   int socket = *(int *)socket_desc;
   int frame = 0;
@@ -239,21 +263,23 @@ void *handle_client(void *socket_desc) {
         break;
       }
     } else if (retval == 0) { // Timeout
-      if (dirty) {
-        Session *session = &neotmux->sessions[neotmux->current_session];
-        if (session->window_count == 0) {
-          send(socket, "e", 1, 0);
-          die("No windows");
-        }
-        run_command(socket, "cRenderScreen", 13);
-        run_command(socket, "cRenderBar", 10);
-        dirty = false;
-      }
-      if (frame % 60 == 0) {
-        run_command(socket, "cRenderBar", 10);
-      }
-      frame++;
     }
+
+    if (dirty && check_timeout(1000000 / 60)) {
+      Session *session = get_current_session(neotmux);
+      if (session->window_count == 0) {
+        send(socket, "e", 1, 0);
+        die("No windows");
+      }
+
+      run_command(socket, "cRenderScreen", 13);
+      run_command(socket, "cRenderBar", 10);
+      dirty = false;
+    }
+    if (frame % 60 == 0) {
+      run_command(socket, "cRenderBar", 10);
+    }
+    frame++;
     pthread_mutex_unlock(&neotmux->mutex);
   }
 

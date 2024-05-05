@@ -134,11 +134,13 @@ void handle_command(int socket, char *buf, int read_size) {
     add_pane(w);
     calculate_layout(w);
     w->current_pane = w->pane_count - 1;
+    w->zoom = -1;
   } else if (strcmp(cmd, "Split") == 0) {
     Window *w = get_current_window(neotmux);
     add_pane(w);
     calculate_layout(w);
     w->current_pane = w->pane_count - 1;
+    w->zoom = -1;
   } else if (strcmp(cmd, "CycleStatus") == 0) {
     neotmux->statusBarIdx++;
   } else if (strcmp(cmd, "List") == 0) {
