@@ -73,19 +73,19 @@ bool compare_colors(VTermColor a, VTermColor b) {
   }
 }
 
-int has_lua_function(lua_State *L, const char *function) {
-  printf("Checking if function exists: %s\n", function);
-  lua_getglobal(L, function);
-  if (lua_isfunction(L, -1)) {
-    printf("Function exists\n");
-    lua_pop(L, 1);
-    return 1;
-  } else {
-    printf("Function does not exist\n");
-    lua_pop(L, 1);
-    return 0;
-  }
-}
+// int has_lua_function(lua_State *L, const char *function) {
+//   printf("Checking if function exists: %s\n", function);
+//   lua_getglobal(L, function);
+//   if (lua_isfunction(L, -1)) {
+//     printf("Function exists\n");
+//     lua_pop(L, 1);
+//     return 1;
+//   } else {
+//     printf("Function does not exist\n");
+//     lua_pop(L, 1);
+//     return 0;
+//   }
+// }
 
 void write_rgb_color(int red, int green, int blue, int type) {
   char buf[32];
@@ -96,27 +96,27 @@ void write_rgb_color(int red, int green, int blue, int type) {
 // TODO: Interpolate into rgb colors
 // TODO: Change from a function to static data
 void write_indexed_color(int idx, int type) {
-  static int has_interpolation_function = -1;
-  if (has_interpolation_function == -1) {
-    has_interpolation_function =
-        has_lua_function(neotmux->lua, "interpolate_color");
-  } else if (has_interpolation_function) {
-    lua_getglobal(neotmux->lua, "interpolate_color");
-    lua_pushinteger(neotmux->lua, idx);
-    lua_call(neotmux->lua, 1, 4);
+  // static int has_interpolation_function = -1;
+  // if (has_interpolation_function == -1) {
+  //   has_interpolation_function =
+  //       has_lua_function(neotmux->lua, "interpolate_color");
+  // } else if (has_interpolation_function) {
+  //   lua_getglobal(neotmux->lua, "interpolate_color");
+  //   lua_pushinteger(neotmux->lua, idx);
+  //   lua_call(neotmux->lua, 1, 4);
 
-    bool use = lua_toboolean(neotmux->lua, -4);
-    int red = lua_tointeger(neotmux->lua, -3);
-    int green = lua_tointeger(neotmux->lua, -2);
-    int blue = lua_tointeger(neotmux->lua, -1);
+  //  bool use = lua_toboolean(neotmux->lua, -4);
+  //  int red = lua_tointeger(neotmux->lua, -3);
+  //  int green = lua_tointeger(neotmux->lua, -2);
+  //  int blue = lua_tointeger(neotmux->lua, -1);
 
-    lua_pop(neotmux->lua, 4);
+  //  lua_pop(neotmux->lua, 4);
 
-    if (use) {
-      write_rgb_color(red, green, blue, type);
-      return;
-    }
-  }
+  //  if (use) {
+  //    write_rgb_color(red, green, blue, type);
+  //    return;
+  //  }
+  //}
 
   char buf[32];
   int n = snprintf(buf, 32, "\033[%d;5;%dm", type, idx);

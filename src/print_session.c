@@ -61,16 +61,22 @@ void print_process_cwd(pid_t pid) {
   }
 }
 
+void print_cursor(Cursor *cursor) {
+  printf("          mouse_active: %s\n",
+         cursor->mouse_active ? "True" : "False");
+  printf("          shape: ");
+  print_cursor_shape(cursor->shape);
+  printf("          visible: %s\n", cursor->visible ? "True" : "False");
+}
+
 void print_process(Process *process) {
   if (process->pid != -1) {
     printf("      Process: %s\n", process->name);
     printf("        pid: %d\n", process->pid);
     printf("        fd: %d\n", process->fd);
     printf("        closed: %s\n", process->closed ? "True" : "False");
-    printf("        cursor_visible: %s\n",
-           process->cursor_visible ? "True" : "False");
-    printf("        cursor_shape: ");
-    print_cursor_shape(process->cursor_shape);
+    printf("        cursor:\n");
+    print_cursor(&process->cursor);
     print_process_cwd(process->pid);
   } else {
     printf("      Process: %s\n", "None");
@@ -83,7 +89,7 @@ void print_pane(Pane *pane) {
   printf("      row: %d\n", pane->row);
   printf("      width: %d\n", pane->width);
   printf("      height: %d\n", pane->height);
-  print_process(&pane->process);
+  print_process(pane->process);
 }
 
 void print_window(Window *window) {

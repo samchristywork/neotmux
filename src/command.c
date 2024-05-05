@@ -20,12 +20,14 @@ Pane *add_pane(Window *window) {
   pane->row = 0;
   pane->width = 80;
   pane->height = 24;
-  pane->process.pid = -1;
-  pane->process.name = NULL;
-  pane->process.fd = -1;
-  pane->process.closed = false;
-  pane->process.cursor_visible = true;
-  pane->process.mouse = VTERM_PROP_MOUSE_NONE;
+  pane->process = malloc(sizeof(*pane->process));
+  pane->process->pid = -1;
+  pane->process->name = NULL;
+  pane->process->fd = -1;
+  pane->process->closed = false;
+  pane->process->cursor.visible = true;
+  pane->process->cursor.mouse_active = VTERM_PROP_MOUSE_NONE;
+  pane->process->cursor.shape = VTERM_PROP_CURSORSHAPE_BLOCK;
   window->pane_count++;
 
   add_process_to_pane(pane);
@@ -172,32 +174,25 @@ void handle_command(int socket, char *buf, int read_size) {
     }
     calculate_layout(w);
   } else if (strcmp(cmd, "ScrollUp") == 0) {
-    printf("Scroll Up\n");
-    Pane *p = &w->panes[w->current_pane];
-    vterm_keyboard_unichar(p->process.vt, VTERM_KEY_UP, 0);
+    Pane *p = get_current_pane(neotmux);
+    vterm_keyboard_unichar(p->process->vt, VTERM_KEY_UP, 0);
   } else if (strcmp(cmd, "ScrollDown") == 0) {
-    printf("Scroll Down\n");
-    Pane *p = &w->panes[w->current_pane];
-    vterm_keyboard_unichar(p->process.vt, VTERM_KEY_DOWN, 0);
+    Pane *p = get_current_pane(neotmux);
+    vterm_keyboard_unichar(p->process->vt, VTERM_KEY_DOWN, 0);
   } else if (memcmp(cmd, "RenameWindow", 12) == 0) {
-    printf("Rename Window\n");
-    Window *window = &session->windows[session->current_window];
+    Window *window = get_current_window(neotmux);
     free(window->title);
     char *title = strdup(cmd + 13);
     window->title = title;
   } else if (memcmp(cmd, "RenameSession", 13) == 0) {
-    printf("Rename Session\n");
-    Session *session = &neotmux->sessions[neotmux->current_session];
+    Session *session = get_current_session(neotmux);
     free(session->title);
     char *title = strdup(cmd + 14);
     session->title = title;
   } else if (strcmp(cmd, "Reload") == 0) {
-    printf("Reloading (%d)\n", socket);
-    fflush(stdout);
     close(socket);
     exit(EXIT_SUCCESS);
   } else {
     printf("Unhandled command (%d): %s\n", socket, cmd);
-    fflush(stdout);
   }
 }

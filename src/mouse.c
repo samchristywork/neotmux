@@ -54,8 +54,8 @@ bool handle_mouse(int socket, char *buf, int read_size) {
   // VTERM_PROP_MOUSE_DRAG,
   // VTERM_PROP_MOUSE_MOVE,
   // TODO: Handle all mouse states
-  if (pane->process.mouse != VTERM_PROP_MOUSE_NONE) {
-    write(pane->process.fd, buf + 1, read_size - 1);
+  if (pane->process->cursor.mouse_active != VTERM_PROP_MOUSE_NONE) {
+    write(pane->process->fd, buf + 1, read_size - 1);
     // TODO: This triggers a redraw, which we might not want.
   }
 

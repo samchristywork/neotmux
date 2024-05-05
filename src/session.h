@@ -17,16 +17,20 @@ typedef enum Layout {
 
 typedef enum BarPosition { BAR_NONE, BAR_TOP, BAR_BOTTOM } BarPosition;
 
+typedef struct Cursor {
+  bool visible;
+  int shape;
+  bool mouse_active;
+} Cursor;
+
 typedef struct Process {
   char *name;
   int pid;
   int fd;
   VTerm *vt;
   VTermScreen *vts;
+  Cursor cursor;
   bool closed;
-  bool cursor_visible;
-  int cursor_shape;
-  int mouse;
 } Process;
 
 typedef struct Pane {
@@ -34,7 +38,7 @@ typedef struct Pane {
   int col;
   int width;
   int height;
-  Process process;
+  Process *process;
 } Pane;
 
 typedef struct Window {

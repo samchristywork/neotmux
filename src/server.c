@@ -109,7 +109,7 @@ void reorder_panes(int socket, Window *w) {
   printf("Reordering panes\n");
   for (int i = 0; i < w->pane_count; i++) {
     Pane *p = &w->panes[i];
-    if (p->process.closed) {
+    if (p->process->closed) {
       for (int j = i; j < w->pane_count - 1; j++) {
         w->panes[j] = w->panes[j + 1];
       }
@@ -149,8 +149,7 @@ bool handle_input(int socket, char *buf, int read_size) {
     memcpy(&width, buf + 1, sizeof(uint32_t));
     memcpy(&height, buf + 5, sizeof(uint32_t));
     printf("Size (%d): %d, %d\n", socket, width, height);
-    Session *session = &neotmux->sessions[neotmux->current_session];
-    Window *window = &session->windows[session->current_window];
+    Window *window = get_current_window(neotmux);
     window->width = width;
     window->height = height;
     reorder_panes(socket, window);
@@ -176,10 +175,8 @@ bool handle_input(int socket, char *buf, int read_size) {
         dirty = true;
       }
     } else {
-      Session *session = &neotmux->sessions[neotmux->current_session];
-      Window *w = &session->windows[session->current_window];
-      Pane *p = &w->panes[w->current_pane];
-      int fd = p->process.fd;
+      Pane *p = get_current_pane(neotmux);
+      int fd = p->process->fd;
       write(fd, buf + 1, read_size - 1);
     }
   } else if (buf[0] == 'c') { // Command
@@ -215,21 +212,19 @@ void *handle_client(void *socket_desc) {
       if (session[i].current_window < 0) {
         continue;
       }
-      // TODO: Should be pointers
       Window *w = &session[i].windows[session[i].current_window];
       for (int j = 0; j < w->pane_count; j++) {
         Pane *p = &w->panes[j];
-        if (p->process.closed) {
+        if (p->process->closed) {
           continue;
         }
 
-        FD_SET(p->process.fd, &fds);
-        if (p->process.fd > max_fd) {
-          max_fd = p->process.fd;
+        FD_SET(p->process->fd, &fds);
+        if (p->process->fd > max_fd) {
+          max_fd = p->process->fd;
         }
       }
     }
-    pthread_mutex_unlock(&neotmux->mutex);
 
     int retval = select(max_fd + 1, &fds, NULL, NULL, &tv);
     if (retval == -1) {
@@ -237,7 +232,6 @@ void *handle_client(void *socket_desc) {
       break;
     }
 
-    pthread_mutex_lock(&neotmux->mutex);
     for (int i = 0; i < neotmux->session_count; i++) {
       Session *session = &neotmux->sessions[i];
       if (session[i].current_window < 0) {
@@ -246,31 +240,30 @@ void *handle_client(void *socket_desc) {
       Window *w = &session[i].windows[session[i].current_window];
       for (int j = 0; j < w->pane_count; j++) {
         Pane *p = &w->panes[j];
-        if (FD_ISSET(p->process.fd, &fds)) {
-          if (p->process.closed) {
+        if (FD_ISSET(p->process->fd, &fds)) {
+          if (p->process->closed) {
             continue;
           }
 
-          char buf[32];
-          int read_size = read(p->process.fd, buf, 32);
+          // TODO: Tune this number
+          static char buf[1000];
+          int read_size = read(p->process->fd, buf, 1000);
           if (read_size == 0) {
-            printf("Process disconnected (%d)\n", p->process.fd);
+            printf("Process disconnected (%d)\n", p->process->fd);
             fflush(stdout);
             exit(EXIT_FAILURE);
           } else if (read_size == -1) {
-            p->process.closed = true;
-            printf("Process closed (%d)\n", p->process.fd);
+            p->process->closed = true;
+            printf("Process closed (%d)\n", p->process->fd);
             reorder_panes(socket, w);
             continue;
           }
-          vterm_input_write(p->process.vt, buf, read_size);
+          vterm_input_write(p->process->vt, buf, read_size);
           dirty = true;
         }
       }
     }
-    pthread_mutex_unlock(&neotmux->mutex);
 
-    pthread_mutex_lock(&neotmux->mutex);
     if (retval && FD_ISSET(socket, &fds)) {
       char buf[32];
       int read_size = read_message(socket, buf, 32);

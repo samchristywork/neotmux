@@ -95,12 +95,9 @@ void write_status_bar(int cols) {
 
 void write_cursor_position() {
   VTermPos cursorPos;
-  Session *currentSession = &neotmux->sessions[neotmux->current_session];
-  Window *currentWindow =
-      &currentSession->windows[currentSession->current_window];
-  if (currentWindow->current_pane != -1) {
-    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
-    VTermState *state = vterm_obtain_state(currentPane->process.vt);
+  Pane *currentPane = get_current_pane(neotmux);
+  if (currentPane) {
+    VTermState *state = vterm_obtain_state(currentPane->process->vt);
     vterm_state_get_cursorpos(state, &cursorPos);
     cursorPos.row += currentPane->row;
     cursorPos.col += currentPane->col;
@@ -114,18 +111,15 @@ void write_cursor_position() {
 }
 
 void write_cursor_style() {
-  Session *currentSession = &neotmux->sessions[neotmux->current_session];
-  Window *currentWindow =
-      &currentSession->windows[currentSession->current_window];
-  if (currentWindow->current_pane != -1) {
-    Pane *currentPane = &currentWindow->panes[currentWindow->current_pane];
-    if (currentPane->process.cursor_visible) {
+  Pane *currentPane = get_current_pane(neotmux);
+  if (currentPane) {
+    if (currentPane->process->cursor.visible) {
       buf_write("\033[?25h", 6); // Show cursor
     } else {
       buf_write("\033[?25l", 6); // Hide cursor
     }
 
-    switch (currentPane->process.cursor_shape) {
+    switch (currentPane->process->cursor.shape) {
     case VTERM_PROP_CURSORSHAPE_BLOCK:
       buf_write("\033[0 q", 6); // Block cursor
       break;

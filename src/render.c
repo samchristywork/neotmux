@@ -31,9 +31,7 @@ FloatingWindow *floatingWindow = NULL;
   int n = snprintf(buf, 32, "\033[%d;%dH", row, col);                          \
   buf_write(buf, n);
 
-void draw_cell(VTermScreenCell cell) {
-  render_cell(cell);
-}
+void draw_cell(VTermScreenCell cell) { render_cell(cell); }
 
 void clear_style() {
   bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));
@@ -122,7 +120,7 @@ void draw_pane(Pane *pane, Window *window) {
       VTermPos pos;
       pos.row = row - pane->row;
       pos.col = col - pane->col;
-      VTermScreen *vts = pane->process.vts;
+      VTermScreen *vts = pane->process->vts;
 
       VTermScreenCell cell = {0};
       vterm_screen_get_cell(vts, pos, &cell);

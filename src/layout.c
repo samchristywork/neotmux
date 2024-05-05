@@ -33,7 +33,7 @@ bool call_lua_layout_function(lua_State *L, const char *function, int *col,
 
 #define update_layout(w)                                                       \
   for (int i = 0; i < w->pane_count; i++) {                                    \
-    vterm_set_size(w->panes[i].process.vt, w->panes[i].height,                 \
+    vterm_set_size(w->panes[i].process->vt, w->panes[i].height,                \
                    w->panes[i].width);                                         \
                                                                                \
     struct winsize ws;                                                         \
@@ -42,7 +42,7 @@ bool call_lua_layout_function(lua_State *L, const char *function, int *col,
     ws.ws_xpixel = 0;                                                          \
     ws.ws_ypixel = 0;                                                          \
                                                                                \
-    if (ioctl(w->panes[i].process.fd, TIOCSWINSZ, &ws) < 0) {                  \
+    if (ioctl(w->panes[i].process->fd, TIOCSWINSZ, &ws) < 0) {                 \
       exit(EXIT_FAILURE);                                                      \
     }                                                                          \
   }

@@ -28,14 +28,15 @@ char *get_lua_string(lua_State *L, const char *name, char *default_value) {
   return result;
 }
 
+// TODO: Make sure we are accessing the right memory
 int handle_term_prop(VTermProp prop, VTermValue *val, void *user) {
-  Pane *pane = (Pane *)user;
+  Process *process = (Process *)user;
   if (prop == VTERM_PROP_CURSORVISIBLE) {
-    pane->process.cursor_visible = val->boolean;
+    process->cursor.visible = val->boolean;
   } else if (prop == VTERM_PROP_CURSORSHAPE) {
-    pane->process.cursor_shape = val->number;
+    process->cursor.shape = val->number;
   } else if (prop == VTERM_PROP_MOUSE) {
-    pane->process.mouse = val->number;
+    process->cursor.mouse_active = val->number;
   }
 
   return 0;
@@ -74,7 +75,7 @@ void initialize_vterm_instance(VTerm **vt, VTermScreen **vts, int h, int w,
   vterm_set_utf8(*vt, 1);
   vterm_screen_reset(*vts, 1);
   vterm_screen_enable_altscreen(*vts, 1);
-  vterm_screen_set_callbacks(*vts, &callbacks, pane);
+  vterm_screen_set_callbacks(*vts, &callbacks, pane->process);
 }
 
 void add_process_to_pane(Pane *pane) {
@@ -85,23 +86,17 @@ void add_process_to_pane(Pane *pane) {
 
   char childName[PATH_MAX];
   pid_t childPid =
-      fork_pseudoterminal(&pane->process.fd, childName, PATH_MAX, &ws);
+      fork_pseudoterminal(&pane->process->fd, childName, PATH_MAX, &ws);
   if (childPid == -1) {
     exit(EXIT_FAILURE);
   } else if (childPid == 0) { // Child
     if (keepDir) {
-      Session *session = &neotmux->sessions[neotmux->current_session];
-      if (session->window_count > 0) {
-        Window *window = &session->windows[session->current_window];
-        if (window->pane_count > 0) {
-          Pane *pane = &window->panes[window->current_pane];
-          char cwd[PATH_MAX] = {0};
-          char link[PATH_MAX] = {0};
-          sprintf(link, "/proc/%d/cwd", pane->process.pid);
-          if (readlink(link, cwd, sizeof(cwd)) != -1) {
-            chdir(cwd);
-          }
-        }
+      Pane *pane = get_current_pane(neotmux);
+      char cwd[PATH_MAX] = {0};
+      char link[PATH_MAX] = {0};
+      sprintf(link, "/proc/%d/cwd", pane->process->pid);
+      if (readlink(link, cwd, sizeof(cwd)) != -1) {
+        chdir(cwd);
       }
     }
 
@@ -114,10 +109,10 @@ void add_process_to_pane(Pane *pane) {
     exit(EXIT_FAILURE);
   }
 
-  pane->process.pid = childPid;
-  pane->process.name = malloc(strlen(childName) + 1);
-  strcpy(pane->process.name, childName);
+  pane->process->pid = childPid;
+  pane->process->name = malloc(strlen(childName) + 1);
+  strcpy(pane->process->name, childName);
 
-  initialize_vterm_instance(&pane->process.vt, &pane->process.vts, ws.ws_row,
+  initialize_vterm_instance(&pane->process->vt, &pane->process->vts, ws.ws_row,
                             ws.ws_col, pane);
 }
