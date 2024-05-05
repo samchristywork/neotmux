@@ -1,91 +1,104 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "render_cell.h"
 #include "session.h"
 
 extern Neotmux *neotmux;
 
-int calculate_printed_width(char *str) {
-  int width = 0;
-  for (int i = 0; str[i]; i++) {
-    if (str[i] == '\033') {
-      while (str[i] && str[i] != 'm') {
-        i++;
-      }
-    } else {
-      width++;
-    }
+char *call_statusbar_function(int cols, lua_State *lua, char *sessionName,
+                              Window *windows, int windowCount,
+                              Window *currentWindow) {
+  lua_getglobal(lua, "statusbar");
+  if (!lua_isfunction(lua, -1)) {
+    printf("statusbar is not a function\n");
+    lua_pop(lua, 1);
+    return NULL;
   }
-  return width;
+
+  int idx = neotmux->statusBarIdx;
+  lua_pushinteger(neotmux->lua, idx);
+
+  lua_pushinteger(lua, cols);
+
+  lua_pushstring(lua, sessionName);
+
+  lua_newtable(lua);
+  for (int i = 0; i < windowCount; i++) {
+    lua_pushinteger(lua, i + 1);
+    lua_newtable(lua);
+
+    lua_pushstring(lua, "title");
+    lua_pushstring(lua, windows[i].title);
+    lua_settable(lua, -3);
+
+    lua_pushstring(lua, "active");
+    lua_pushboolean(lua, &windows[i] == currentWindow);
+    lua_settable(lua, -3);
+
+    lua_pushstring(lua, "zoom");
+    lua_pushboolean(lua, windows[i].zoom >= 0);
+    lua_settable(lua, -3);
+
+    lua_settable(lua, -3);
+  }
+
+  lua_call(lua, 4, 1);
+  char *statusbar = strdup(lua_tostring(lua, -1));
+  lua_pop(lua, 1);
+  return statusbar;
 }
 
-// TODO: Handle overflow condition
+VTerm *vt = NULL;
+VTermScreen *vts;
+
+// TODO: Ensure line gets cleared
 void write_status_bar(int cols) {
-  int width = 0;
-  Session *session = &neotmux->sessions[neotmux->current_session];
-  Window *current_window = &session->windows[session->current_window];
+  if (vt == NULL) {
+    vt = vterm_new(1, 1);
+    vts = vterm_obtain_screen(vt);
+    vterm_set_size(vt, 1, 1000); // Essentially disables wrap
 
-  buf_write("\033[7m", 4); // Invert colors
-  static int bar_color = -1;
-  if (bar_color == -1) {
-    lua_getglobal(neotmux->lua, "bar_color");
-    if (lua_isnumber(neotmux->lua, -1)) {
-      bar_color = lua_tointeger(neotmux->lua, -1);
-    } else {
-      bar_color = 0;
-    }
-  }
-  buf_color(bar_color);
+    static VTermScreenCallbacks callbacks;
+    callbacks.damage = NULL;
+    callbacks.moverect = NULL;
+    callbacks.movecursor = NULL;
+    callbacks.settermprop = NULL;
+    callbacks.bell = NULL;
+    callbacks.resize = NULL;
+    callbacks.sb_pushline = NULL;
+    callbacks.sb_popline = NULL;
 
-  char *sessionName = session->title;
-  buf_write("[", 1);
-  width++;
-
-  buf_write(sessionName, strlen(sessionName));
-  width += strlen(sessionName);
-
-  buf_write("]", 1);
-  width += 1;
-
-  for (int i = 0; i < session->window_count; i++) {
-    Window *window = &session->windows[i];
-    buf_write("  ", 2);
-    width += 2;
-
-    buf_write(window->title, strlen(window->title));
-    width += strlen(window->title);
-
-    if (window == current_window) {
-      buf_write("*", 1);
-      width++;
-    }
-
-    if (window->zoom != -1) {
-      buf_write("Z", 1);
-      width += 1;
-    }
+    vterm_set_utf8(vt, 1);
+    vterm_screen_reset(vts, 1);
+    vterm_screen_set_callbacks(vts, &callbacks, NULL);
   }
 
-  char *statusRight = NULL;
-  lua_getglobal(neotmux->lua, "status_right");
-  if (lua_isfunction(neotmux->lua, -1)) {
-    int idx = neotmux->statusBarIdx;
-    lua_pushinteger(neotmux->lua, idx);
-    lua_call(neotmux->lua, 1, 1);
-    statusRight = strdup(lua_tostring(neotmux->lua, -1));
-    lua_pop(neotmux->lua, 1);
-  } else {
-    statusRight = strdup("");
+  Session *session = get_current_session(neotmux);
+  Window *current_window = get_current_window(neotmux);
+
+  char *statusbar = call_statusbar_function(
+      cols, neotmux->lua, session->title, session->windows,
+      session->window_count, current_window);
+
+  if (statusbar) {
+    vterm_input_write(vt, "\033[0m", 4);      // Reset colors
+    vterm_input_write(vt, "\033[7m", 4);      // Enable reverse
+    vterm_input_write(vt, "\033[38;5;4m", 9); // Set foreground color
+    vterm_input_write(vt, "\033[1;1H", 6);    // Move cursor to top left
+    vterm_input_write(vt, "\033[2K", 4);      // Clear line
+    vterm_input_write(vt, statusbar, strlen(statusbar));
+    free(statusbar);
+
+    VTermScreenCell cell;
+    for (int i = 0; i < cols; i++) {
+      VTermPos pos = {0};
+      pos.col = i;
+      pos.row = 0;
+      vterm_screen_get_cell(vts, pos, &cell);
+      render_cell(cell);
+    }
   }
-  width += calculate_printed_width(statusRight);
-
-  char padding[cols - width];
-  memset(padding, ' ', cols - width);
-
-  buf_write(padding, cols - width);
-  buf_write(statusRight, strlen(statusRight));
-  buf_write("\033[0m", 4);
-  free(statusRight);
 }
 
 #define write_position(row, col)                                               \

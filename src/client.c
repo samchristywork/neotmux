@@ -8,10 +8,10 @@
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <termios.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 struct termios term;
 enum Mode { MODE_NORMAL, MODE_CONTROL, MODE_CONTROL_STICKY };
@@ -309,7 +309,8 @@ int start_client(int port, char *name) {
   mkdir("/tmp/ntmux-1000", 0777);
   struct sockaddr_un server;
   server.sun_family = AF_UNIX;
-  snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock", name);
+  snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock",
+           name);
   sock = socket(AF_UNIX, SOCK_STREAM, 0);
 
   ctrl_c_socket = sock;
