@@ -6,12 +6,12 @@
 #include <lua5.4/lualib.h>
 #include <pthread.h>
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <sys/time.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include "command.h"
+#include "connection.h"
 #include "mouse.h"
 #include "plugin.h"
 #include "session.h"
@@ -34,47 +34,15 @@ ssize_t read_message(int sock, char *buf, size_t len) {
 }
 
 int die_socket_desc = -1;
-void die(char *msg) {
-  if (msg) {
-    printf("%s\n", msg);
-  }
-  close(die_socket_desc);
-  printf("Exiting...\n");
+#define die(msg)                                                               \
+  printf("%s\n", msg);                                                         \
+  close(die_socket_desc);                                                      \
+  printf("Exiting...\n");                                                      \
   exit(EXIT_SUCCESS);
-}
 
 void handle_ctrl_c(int sig) {
   signal(SIGINT, handle_ctrl_c);
   die("Ctrl-C");
-}
-
-struct sockaddr_in setup_server(int socket_desc, int port) {
-  struct sockaddr_in server;
-  server.sin_family = AF_INET;
-  server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = htons(port);
-
-  if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0) {
-    puts("bind failed");
-    exit(EXIT_FAILURE);
-  }
-
-  return server;
-}
-
-void wait_for_connections(int socket_desc) {
-  listen(socket_desc, 3);
-  puts("Waiting for incoming connections...");
-}
-
-int accept_connection(int socket_desc, struct sockaddr_in client) {
-  int c = sizeof(struct sockaddr_in);
-  int socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&c);
-  if (socket < 0) {
-    perror("accept failed");
-    exit(EXIT_FAILURE);
-  }
-  return socket;
 }
 
 void reorder_windows() {
@@ -137,11 +105,11 @@ void reorder_panes(int socket, Window *w) {
 bool handle_input(int socket, char *buf, int read_size) {
   if (read_size == 0) { // Client disconnected
     printf("Client disconnected (%d)\n", socket);
-    die(NULL);
+    die("Client disconnected");
     return false;
   } else if (read_size == -1) { // Error
     printf("Error reading from client (%d)\n", socket);
-    die(NULL);
+    die("Error reading from client");
     return false;
   } else if (buf[0] == 's') { // Size
     uint32_t width;
@@ -293,7 +261,7 @@ void *handle_client(void *socket_desc) {
   return 0;
 }
 
-int start_server(int port) {
+int init_ntmux() {
   neotmux = malloc(sizeof(*neotmux));
   neotmux->sessions = NULL;
   neotmux->session_count = 0;
@@ -351,21 +319,53 @@ int start_server(int port) {
     return EXIT_FAILURE;
   }
 
+  return EXIT_SUCCESS;
+}
+
+char *sockname;
+void cleanup() {
+  struct sockaddr_un server;
+  snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock",
+           sockname);
+  unlink(server.sun_path);
+}
+
+int start_server(int port, char *name) {
+  sockname = name;
+  if (init_ntmux() == EXIT_FAILURE) {
+    return EXIT_FAILURE;
+  }
+
   signal(SIGINT, handle_ctrl_c);
 
-  int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+  // int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+  int socket_desc = socket(AF_UNIX, SOCK_STREAM, 0);
+
   die_socket_desc = socket_desc;
   if (socket_desc == -1) {
     printf("Could not create socket");
     return EXIT_FAILURE;
   }
 
-  setup_server(socket_desc, port);
+  // struct sockaddr_in server;
+  // server.sin_family = AF_INET;
+  // server.sin_addr.s_addr = INADDR_ANY;
+  // server.sin_port = htons(port);
+
+  struct sockaddr_un server;
+  server.sun_family = AF_UNIX;
+  snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock",
+           name);
+
+  atexit(cleanup);
+
+  if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0) {
+    puts("bind failed");
+    exit(EXIT_FAILURE);
+  }
+
   while (1) {
-    wait_for_connections(socket_desc);
-    struct sockaddr_in client;
-    int *socket = malloc(sizeof(*socket));
-    *socket = accept_connection(socket_desc, client);
+    int *socket = init_connection(socket_desc);
 
     pthread_t t;
     if (pthread_create(&t, NULL, handle_client, (void *)socket) < 0) {

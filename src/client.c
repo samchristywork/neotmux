@@ -8,8 +8,10 @@
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 struct termios term;
 enum Mode { MODE_NORMAL, MODE_CONTROL, MODE_CONTROL_STICKY };
@@ -59,20 +61,6 @@ void reset_mode() {
   term.c_lflag |= ICANON | ECHO;
   tcsetattr(STDIN_FILENO, TCSANOW, &term);
   rawMode = false;
-}
-
-void configure_server(struct sockaddr_in *server, int port) {
-  server->sin_addr.s_addr = inet_addr("127.0.0.1");
-  server->sin_family = AF_INET;
-  server->sin_port = htons(port);
-}
-
-int connect_to_server(int sock, struct sockaddr_in *server) {
-  if (connect(sock, (struct sockaddr *)server, sizeof(*server)) < 0) {
-    perror("connect failed. Error");
-    return 1;
-  }
-  return 0;
 }
 
 bool receive_message(int sock) {
@@ -292,13 +280,22 @@ void *receive_messages(void *socket_desc) {
   exit(EXIT_SUCCESS);
 }
 
-int start_client(int port) {
+int start_client(int port, char *name) {
   signal(SIGINT, handle_sigint);
+  int sock;
 
-  struct sockaddr_in server;
-  configure_server(&server, port);
+  // struct sockaddr_in server;
+  // server.sin_addr.s_addr = inet_addr("127.0.0.1");
+  // server.sin_family = AF_INET;
+  // server.sin_port = htons(port);
+  // sock = socket(AF_INET, SOCK_STREAM, 0);
 
-  int sock = socket(AF_INET, SOCK_STREAM, 0);
+  mkdir("/tmp/ntmux-1000", 0777);
+  struct sockaddr_un server;
+  server.sun_family = AF_UNIX;
+  snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock", name);
+  sock = socket(AF_UNIX, SOCK_STREAM, 0);
+
   ctrl_c_socket = sock;
   if (sock == -1) {
     perror("Could not create socket");
@@ -306,7 +303,8 @@ int start_client(int port) {
     return EXIT_FAILURE;
   }
 
-  if (connect_to_server(sock, &server)) {
+  if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
+    perror("connect failed. Error");
     close(sock);
     return EXIT_FAILURE;
   }
