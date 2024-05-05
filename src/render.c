@@ -238,10 +238,9 @@ void render_screen(int fd) {
   }
 
   neotmux->bb.n = 0;
+  buf_write("\033[?25l", 6); // Hide cursor
 
-  Session *currentSession = &neotmux->sessions[neotmux->current_session];
-  Window *currentWindow =
-      &currentSession->windows[currentSession->current_window];
+  Window *currentWindow = get_current_window(neotmux);
   if (currentWindow->zoom != -1) {
     Pane *pane = &currentWindow->panes[currentWindow->zoom];
     draw_pane(pane, currentWindow);

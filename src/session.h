@@ -94,4 +94,8 @@ typedef struct Neotmux {
     buf_write(buf, n);                                                         \
   } while (0)
 
+Session *get_current_session(Neotmux *neotmux);
+Window *get_current_window(Neotmux *neotmux);
+Pane *get_current_pane(Neotmux *neotmux);
+
 #endif

@@ -97,22 +97,33 @@ void handle_command(int socket, char *buf, int read_size) {
       lua_pop(neotmux->lua, 1);
     }
 
+    Window *w = get_current_window(neotmux);
     window->width = w->width;
     window->height = w->height;
     add_pane(window);
     session->current_window = session->window_count - 1;
-    calculate_layout(&session->windows[session->current_window]);
+
+    Window *currentWindow = get_current_window(neotmux);
+    calculate_layout(currentWindow);
   } else if (strcmp(cmd, "RenderScreen") == 0) {
     render_screen(socket);
   } else if (strcmp(cmd, "RenderBar") == 0) {
     render_bar(socket);
   } else if (strcmp(cmd, "Layout") == 0) {
-    calculate_layout(&session->windows[session->current_window]);
+    // TODO: Fix
+    // if (session->current_window > 0 &&
+    //    session->current_window < session->window_count) {
+
+    Window *currentWindow = get_current_window(neotmux);
+    calculate_layout(currentWindow);
+    //}
   } else if (strcmp(cmd, "VSplit") == 0) {
+    Window *w = get_current_window(neotmux);
     add_pane(w);
     calculate_layout(w);
     w->current_pane = w->pane_count - 1;
   } else if (strcmp(cmd, "Split") == 0) {
+    Window *w = get_current_window(neotmux);
     add_pane(w);
     calculate_layout(w);
     w->current_pane = w->pane_count - 1;
@@ -121,52 +132,59 @@ void handle_command(int socket, char *buf, int read_size) {
   } else if (strcmp(cmd, "List") == 0) {
     print_sessions(neotmux);
   } else if (strcmp(cmd, "Next") == 0) {
-    Session *session = &neotmux->sessions[neotmux->current_session];
+    Session *session = get_current_session(neotmux);
     session->current_window++;
     if (session->current_window >= session->window_count) {
       session->current_window = 0;
     }
-    calculate_layout(&session->windows[session->current_window]);
+    Window *currentWindow = get_current_window(neotmux);
+    calculate_layout(currentWindow);
   } else if (strcmp(cmd, "Prev") == 0) {
-    Session *session = &neotmux->sessions[neotmux->current_session];
+    Session *session = get_current_session(neotmux);
     session->current_window--;
     if (session->current_window < 0) {
       session->current_window = session->window_count - 1;
     }
-    calculate_layout(&session->windows[session->current_window]);
+    Window *currentWindow = get_current_window(neotmux);
+    calculate_layout(currentWindow);
   } else if (strcmp(cmd, "Left") == 0) {
+    Window *w = get_current_window(neotmux);
     w->current_pane = move_active_pane(LEFT, w);
   } else if (strcmp(cmd, "Right") == 0) {
+    Window *w = get_current_window(neotmux);
     w->current_pane = move_active_pane(RIGHT, w);
   } else if (strcmp(cmd, "Up") == 0) {
+    Window *w = get_current_window(neotmux);
     w->current_pane = move_active_pane(UP, w);
   } else if (strcmp(cmd, "Down") == 0) {
+    Window *w = get_current_window(neotmux);
     w->current_pane = move_active_pane(DOWN, w);
   } else if (strcmp(cmd, "Even_Horizontal") == 0) {
-    printf("Even Horizontal\n");
+    Window *w = get_current_window(neotmux);
     w->layout = LAYOUT_EVEN_HORIZONTAL;
     calculate_layout(w);
   } else if (strcmp(cmd, "Even_Vertical") == 0) {
-    printf("Even Vertical\n");
+    Window *w = get_current_window(neotmux);
     w->layout = LAYOUT_EVEN_VERTICAL;
     calculate_layout(w);
   } else if (strcmp(cmd, "Main_Horizontal") == 0) {
-    printf("Main Horizontal\n");
+    Window *w = get_current_window(neotmux);
     w->layout = LAYOUT_MAIN_HORIZONTAL;
     calculate_layout(w);
   } else if (strcmp(cmd, "Main_Vertical") == 0) {
-    printf("Main Vertical\n");
+    Window *w = get_current_window(neotmux);
     w->layout = LAYOUT_MAIN_VERTICAL;
     calculate_layout(w);
   } else if (strcmp(cmd, "Tiled") == 0) {
-    printf("Tiled\n");
+    Window *w = get_current_window(neotmux);
     w->layout = LAYOUT_TILED;
     calculate_layout(w);
   } else if (strcmp(cmd, "Custom") == 0) {
-    printf("Custom\n");
+    Window *w = get_current_window(neotmux);
     w->layout = LAYOUT_CUSTOM;
     calculate_layout(w);
   } else if (strcmp(cmd, "Zoom") == 0) {
+    Window *w = get_current_window(neotmux);
     if (w->zoom == -1) {
       w->zoom = w->current_pane;
     } else {

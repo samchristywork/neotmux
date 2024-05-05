@@ -24,8 +24,7 @@ bool handle_mouse(int socket, char *buf, int read_size) {
 
   if (b == 0) {
     printf("Left click\n");
-    Session *session = &neotmux->sessions[neotmux->current_session];
-    Window *w = &session->windows[session->current_window];
+    Window *w = get_current_window(neotmux);
     for (int i = 0; i < w->pane_count; i++) {
       printf("Checking pane %d\n", i);
       printf("  %d, %d, %d, %d\n", w->panes[i].col, w->panes[i].row,
@@ -45,9 +44,7 @@ bool handle_mouse(int socket, char *buf, int read_size) {
     }
   }
 
-  Session *session = &neotmux->sessions[neotmux->current_session];
-  Window *window = &session->windows[session->current_window];
-  Pane *pane = &window->panes[window->current_pane];
+  Pane *pane = get_current_pane(neotmux);
 
   // VTERM_PROP_MOUSE_NONE = 0,
   // VTERM_PROP_MOUSE_CLICK,

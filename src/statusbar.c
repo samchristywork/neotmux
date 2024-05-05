@@ -137,10 +137,9 @@ void write_cursor_style() {
 
 void render_bar(int fd) {
   neotmux->bb.n = 0;
+  buf_write("\033[?25l", 6); // Hide cursor
 
-  Session *currentSession = &neotmux->sessions[neotmux->current_session];
-  Window *currentWindow =
-      &currentSession->windows[currentSession->current_window];
+  Window *currentWindow = get_current_window(neotmux);
   int cols = currentWindow->width;
   int rows = currentWindow->height;
 
