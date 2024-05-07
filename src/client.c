@@ -120,8 +120,7 @@ void handle_binding(int numRead, char *buf, int sock, char *command,
 char *readline_text;
 void add_readline_history() { rl_insert_text(readline_text); }
 
-// TODO: Deduplicate this
-void handle_create_window(int sock) {
+void handle_rename(int sock, char *prompt, char *default_name, char *command) {
   reset_mode();
   struct winsize ws;
   ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
@@ -131,48 +130,14 @@ void handle_create_window(int sock) {
   printf("\033[%d;1H", height); // Move to bottom of screen
   printf("\033[K");             // Clear line
 
-  readline_text = "Window";
-  char *input = readline("Name of New Window: ");
+  readline_text = default_name;
+  char *input = readline(prompt);
   char buf[32];
-  sprintf(buf, "cRenameWindow %s", input);
-  write_message(sock, "cCreate", 7);
-  write_message(sock, buf, strlen(buf));
-  enter_raw_mode();
-}
 
-void handle_window_rename(int sock) {
-  reset_mode();
-  struct winsize ws;
-  ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-  uint32_t height = ws.ws_row;
-
-  printf("\033[0m");            // Reset colors
-  printf("\033[%d;1H", height); // Move to bottom of screen
-  printf("\033[K");             // Clear line
-
-  readline_text = "Window"; // TODO: Get this from server
-  char *input = readline("Rename Window: ");
-  char buf[32];
-  sprintf(buf, "cRenameWindow %s", input);
-  write_message(sock, buf, strlen(buf));
-  enter_raw_mode();
-}
-
-void handle_session_rename(int sock) {
-  reset_mode();
-  struct winsize ws;
-  ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-  uint32_t height = ws.ws_row;
-
-  printf("\033[0m");            // Reset colors
-  printf("\033[%d;1H", height); // Move to bottom of screen
-  printf("\033[K");             // Clear line
-
-  readline_text = "Session"; // TODO: Get this from server
-  char *input = readline("Rename Session: ");
-  char buf[32];
-  sprintf(buf, "cRenameSession %s", input);
-  write_message(sock, buf, strlen(buf));
+  if (strlen(input) > 0) {
+    sprintf(buf, "%s %s", command, input);
+    write_message(sock, buf, strlen(buf));
+  }
   enter_raw_mode();
 }
 
@@ -238,11 +203,11 @@ void handle_events(int sock) {
       handle_binding(n, buf, sock, "cDown", "\033[B");        // Down
 
       if (n == 1 && buf[1] == 'c') {
-        handle_create_window(sock);
+        handle_rename(sock, "Name of New Window: ", "Window", "cCreateNamed");
       } else if (n == 1 && buf[1] == ',') {
-        handle_window_rename(sock);
+        handle_rename(sock, "Rename Window: ", "Window", "cRenameWindow");
       } else if (n == 1 && buf[1] == '$') {
-        handle_session_rename(sock);
+        handle_rename(sock, "Rename Session: ", "Session", "cRenameSession");
       }
 
       if (n == 1 && buf[1] == 'n') {
