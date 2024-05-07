@@ -261,35 +261,9 @@ void *receive_messages(void *socket_desc) {
   exit(EXIT_SUCCESS);
 }
 
-int start_client(int port, char *name) {
+void start_client(int sock) {
   signal(SIGINT, handle_sigint);
-  int sock;
-
-  // struct sockaddr_in server;
-  // server.sin_addr.s_addr = inet_addr("127.0.0.1");
-  // server.sin_family = AF_INET;
-  // server.sin_port = htons(port);
-  // sock = socket(AF_INET, SOCK_STREAM, 0);
-
-  mkdir("/tmp/ntmux-1000", 0777);
-  struct sockaddr_un server;
-  server.sun_family = AF_UNIX;
-  snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock",
-           name);
-  sock = socket(AF_UNIX, SOCK_STREAM, 0);
-
   ctrl_c_socket = sock;
-  if (sock == -1) {
-    perror("Could not create socket");
-    close(sock);
-    return EXIT_FAILURE;
-  }
-
-  if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
-    perror("connect failed. Error");
-    close(sock);
-    return EXIT_FAILURE;
-  }
 
   write(STDOUT_FILENO, "\033[?1049h", 8); // Alternate screen
 
@@ -300,9 +274,8 @@ int start_client(int port, char *name) {
 
   pthread_cancel(thread);
   pthread_join(thread, NULL);
-  close(sock);
 
   write(STDOUT_FILENO, "\033[?1049l", 8); // Normal screen
 
-  return EXIT_SUCCESS;
+  close(sock);
 }
