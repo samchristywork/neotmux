@@ -5,7 +5,6 @@
 #include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
 #include <pthread.h>
-#include <signal.h>
 #include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -38,11 +37,6 @@ int die_socket_desc = -1;
   close(die_socket_desc);                                                      \
   fprintf(neotmux->log, "Exiting...\n");                                       \
   exit(EXIT_SUCCESS);
-
-void handle_ctrl_c(int sig) {
-  signal(SIGINT, handle_ctrl_c);
-  die("Ctrl-C");
-}
 
 void reorder_windows() {
   for (int i = 0; i < neotmux->session_count; i++) {
@@ -307,38 +301,13 @@ void cleanup() {
   fclose(neotmux->log);
 }
 
-int start_server(int port, char *name) {
-  sockname = name;
-  if (init_ntmux() == EXIT_FAILURE) {
-    return EXIT_FAILURE;
-  }
-
-  signal(SIGINT, handle_ctrl_c);
-
-  // int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
-  int socket_desc = socket(AF_UNIX, SOCK_STREAM, 0);
-
+void start_server_loop(int socket_desc) {
   die_socket_desc = socket_desc;
-  if (socket_desc == -1) {
-    fprintf(neotmux->log, "Could not create socket");
-    return EXIT_FAILURE;
-  }
-
-  // struct sockaddr_in server;
-  // server.sin_family = AF_INET;
-  // server.sin_addr.s_addr = INADDR_ANY;
-  // server.sin_port = htons(port);
-
-  struct sockaddr_un server;
-  server.sun_family = AF_UNIX;
-  snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock",
-           name);
 
   atexit(cleanup);
 
-  if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0) {
-    puts("bind failed");
-    exit(EXIT_FAILURE);
+  if (init_ntmux() == EXIT_FAILURE) {
+    return;
   }
 
   while (1) {
@@ -347,9 +316,16 @@ int start_server(int port, char *name) {
     pthread_t t;
     if (pthread_create(&t, NULL, handle_client, (void *)socket) < 0) {
       perror("Could not create thread");
-      return EXIT_FAILURE;
+      break;
     }
   }
+}
+
+int start_server(int sock, char *name) {
+  sockname = name;
+  printf("Sockname: %s\n", name);
+
+  start_server_loop(sock);
 
   return EXIT_SUCCESS;
 }
