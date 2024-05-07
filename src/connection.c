@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "session.h"
+
+extern Neotmux *neotmux;
+
 int accept_connection(int socket_desc, struct sockaddr_in client) {
   int c = sizeof(struct sockaddr_in);
   int socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&c);
@@ -14,7 +18,7 @@ int accept_connection(int socket_desc, struct sockaddr_in client) {
 
 void wait_for_connection(int socket_desc) {
   listen(socket_desc, 3);
-  puts("Waiting for incoming connections...");
+  fprintf(neotmux->log, "Waiting for incoming connections...");
 }
 
 int *init_connection(int socket_desc) {

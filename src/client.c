@@ -164,6 +164,12 @@ void handle_events(int sock) {
         write_message(sock, "cUp", 3);
       } else if (n == 2 && buf[1] == 27 && buf[2] == 'j') {
         write_message(sock, "cDown", 5);
+      } else if (n == 2 && buf[1] == 27 && buf[2] == ',') {
+        write_message(sock, "cPrev", 5);
+      } else if (n == 2 && buf[1] == 27 && buf[2] == '.') {
+        write_message(sock, "cNext", 5);
+      } else if (n == 2 && buf[1] == 27 && buf[2] == 'z') {
+        write_message(sock, "cZoom", 5);
       } else if (n == 1 && buf[1] == 1) { // Ctrl-A
         mode = MODE_CONTROL;
       } else if (n == 1 && buf[1] == 10) { // Enter
