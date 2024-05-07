@@ -209,11 +209,11 @@ void handle_events(int sock) {
       handle_binding(n, buf, sock, "cDown", "\033[B");        // Down
 
       if (n == 1 && buf[1] == 'c') {
-        handle_rename(sock, "Name of New Window: ", "Window", "cCreateNamed");
+        handle_rename(sock, "Name of New Window: ", "", "cCreateNamed");
       } else if (n == 1 && buf[1] == ',') {
-        handle_rename(sock, "Rename Window: ", "Window", "cRenameWindow");
+        handle_rename(sock, "Rename Window: ", "", "cRenameWindow");
       } else if (n == 1 && buf[1] == '$') {
-        handle_rename(sock, "Rename Session: ", "Session", "cRenameSession");
+        handle_rename(sock, "Rename Session: ", "", "cRenameSession");
       }
 
       if (n == 1 && buf[1] == 'n') {
