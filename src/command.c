@@ -74,7 +74,7 @@ void handle_command(int socket, char *buf, int read_size) {
   memcpy(cmd, buf + 1, read_size - 1);
   cmd[read_size - 1] = '\0';
 
-  printf("Command (%d): %s\n", socket, cmd);
+  fprintf(neotmux->log, "Command (%d): %s\n", socket, cmd);
 
   if (strcmp(cmd, "Init") == 0) {
     load_plugins();

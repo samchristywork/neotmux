@@ -2,6 +2,7 @@
 #define SESSION_H
 
 #include <lua5.4/lua.h>
+#include <stdio.h>
 #include <string.h>
 #include <vterm.h>
 
@@ -75,6 +76,7 @@ typedef struct Neotmux {
   VTermScreenCell prevCell;
   BarPosition barPos;
   int statusBarIdx;
+  FILE *log;
 } Neotmux;
 
 #define buf_write(buf, count)                                                  \

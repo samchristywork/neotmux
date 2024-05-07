@@ -74,14 +74,14 @@ bool compare_colors(VTermColor a, VTermColor b) {
 }
 
 // int has_lua_function(lua_State *L, const char *function) {
-//   printf("Checking if function exists: %s\n", function);
+//   fprintf(neotmux->log, "Checking if function exists: %s\n", function);
 //   lua_getglobal(L, function);
 //   if (lua_isfunction(L, -1)) {
-//     printf("Function exists\n");
+//     fprintf(neotmux->log, "Function exists\n");
 //     lua_pop(L, 1);
 //     return 1;
 //   } else {
-//     printf("Function does not exist\n");
+//     fprintf(neotmux->log, "Function does not exist\n");
 //     lua_pop(L, 1);
 //     return 0;
 //   }

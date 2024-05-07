@@ -4,28 +4,30 @@
 
 #include "print_session.h"
 
+extern Neotmux *neotmux;
+
 void print_layout(Layout layout) {
   switch (layout) {
   case LAYOUT_DEFAULT:
-    printf("Default");
+    fprintf(neotmux->log, "Default");
     break;
   case LAYOUT_EVEN_HORIZONTAL:
-    printf("Even Horizontal");
+    fprintf(neotmux->log, "Even Horizontal");
     break;
   case LAYOUT_EVEN_VERTICAL:
-    printf("Even Vertical");
+    fprintf(neotmux->log, "Even Vertical");
     break;
   case LAYOUT_MAIN_HORIZONTAL:
-    printf("Main Horizontal");
+    fprintf(neotmux->log, "Main Horizontal");
     break;
   case LAYOUT_MAIN_VERTICAL:
-    printf("Main Vertical");
+    fprintf(neotmux->log, "Main Vertical");
     break;
   case LAYOUT_TILED:
-    printf("Tiled");
+    fprintf(neotmux->log, "Tiled");
     break;
   default:
-    printf("Unknown");
+    fprintf(neotmux->log, "Unknown");
     break;
   }
 }
@@ -33,23 +35,23 @@ void print_layout(Layout layout) {
 void print_cursor_shape(int cursor_shape) {
   switch (cursor_shape) {
   case 0:
-    printf("Default");
+    fprintf(neotmux->log, "Default");
     break;
   case VTERM_PROP_CURSORSHAPE_BLOCK:
-    printf("Block");
+    fprintf(neotmux->log, "Block");
     break;
   case VTERM_PROP_CURSORSHAPE_UNDERLINE:
-    printf("Underline");
+    fprintf(neotmux->log, "Underline");
     break;
   case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
-    printf("Bar Left");
+    fprintf(neotmux->log, "Bar Left");
     break;
   default:
-    printf("Unknown");
+    fprintf(neotmux->log, "Unknown");
     break;
   }
 
-  printf("\n");
+  fprintf(neotmux->log, "\n");
 }
 
 void print_process_cwd(pid_t pid) {
@@ -57,48 +59,48 @@ void print_process_cwd(pid_t pid) {
   char link[PATH_MAX] = {0};
   sprintf(link, "/proc/%d/cwd", pid);
   if (readlink(link, cwd, sizeof(cwd)) != -1) {
-    printf("        cwd: %s\n", cwd);
+    fprintf(neotmux->log, "        cwd: %s\n", cwd);
   }
 }
 
 void print_cursor(Cursor *cursor) {
-  printf("          mouse_active: %s\n",
+  fprintf(neotmux->log, "          mouse_active: %s\n",
          cursor->mouse_active ? "True" : "False");
-  printf("          shape: ");
+  fprintf(neotmux->log, "          shape: ");
   print_cursor_shape(cursor->shape);
-  printf("          visible: %s\n", cursor->visible ? "True" : "False");
+  fprintf(neotmux->log, "          visible: %s\n", cursor->visible ? "True" : "False");
 }
 
 void print_process(Process *process) {
   if (process->pid != -1) {
-    printf("      Process: %s\n", process->name);
-    printf("        pid: %d\n", process->pid);
-    printf("        fd: %d\n", process->fd);
-    printf("        closed: %s\n", process->closed ? "True" : "False");
-    printf("        cursor:\n");
+    fprintf(neotmux->log, "      Process: %s\n", process->name);
+    fprintf(neotmux->log, "        pid: %d\n", process->pid);
+    fprintf(neotmux->log, "        fd: %d\n", process->fd);
+    fprintf(neotmux->log, "        closed: %s\n", process->closed ? "True" : "False");
+    fprintf(neotmux->log, "        cursor:\n");
     print_cursor(&process->cursor);
     print_process_cwd(process->pid);
   } else {
-    printf("      Process: %s\n", "None");
+    fprintf(neotmux->log, "      Process: %s\n", "None");
   }
 }
 
 void print_pane(Pane *pane) {
-  printf("    Pane: %p\n", (void *)pane);
-  printf("      col: %d\n", pane->col);
-  printf("      row: %d\n", pane->row);
-  printf("      width: %d\n", pane->width);
-  printf("      height: %d\n", pane->height);
+  fprintf(neotmux->log, "    Pane: %p\n", (void *)pane);
+  fprintf(neotmux->log, "      col: %d\n", pane->col);
+  fprintf(neotmux->log, "      row: %d\n", pane->row);
+  fprintf(neotmux->log, "      width: %d\n", pane->width);
+  fprintf(neotmux->log, "      height: %d\n", pane->height);
   print_process(pane->process);
 }
 
 void print_window(Window *window) {
-  printf("  Window: %s\n", window->title);
-  printf("    Pane Count: %d\n", window->pane_count);
-  printf("    Current Pane: %d\n", window->current_pane);
-  printf("    Layout: ");
+  fprintf(neotmux->log, "  Window: %s\n", window->title);
+  fprintf(neotmux->log, "    Pane Count: %d\n", window->pane_count);
+  fprintf(neotmux->log, "    Current Pane: %d\n", window->current_pane);
+  fprintf(neotmux->log, "    Layout: ");
   print_layout(window->layout);
-  printf("\n");
+  fprintf(neotmux->log, "\n");
   for (int j = 0; j < window->pane_count; j++) {
     Pane *pane = &window->panes[j];
     print_pane(pane);
@@ -106,9 +108,9 @@ void print_window(Window *window) {
 }
 
 void print_session(Session *session) {
-  printf("Session: %s\n", session->title);
-  printf("  Window Count: %d\n", session->window_count);
-  printf("  Current Window: %d\n", session->current_window);
+  fprintf(neotmux->log, "Session: %s\n", session->title);
+  fprintf(neotmux->log, "  Window Count: %d\n", session->window_count);
+  fprintf(neotmux->log, "  Current Window: %d\n", session->current_window);
   for (int i = 0; i < session->window_count; i++) {
     Window *window = &session->windows[i];
     print_window(window);

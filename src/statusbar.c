@@ -11,7 +11,7 @@ char *call_statusbar_function(int cols, lua_State *lua, char *sessionName,
                               Window *currentWindow) {
   lua_getglobal(lua, "statusbar");
   if (!lua_isfunction(lua, -1)) {
-    printf("statusbar is not a function\n");
+    fprintf(neotmux->log, "statusbar is not a function\n");
     lua_pop(lua, 1);
     return NULL;
   }

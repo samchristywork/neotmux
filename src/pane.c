@@ -44,11 +44,11 @@ int handle_term_prop(VTermProp prop, VTermValue *val, void *user) {
 
 int handle_push_line(int cols, const VTermScreenCell *cells, void *user) {
   // TODO: Copy these lines into scrollback buffer
-  printf("Cols: %d\n", cols);
+  fprintf(neotmux->log, "Cols: %d\n", cols);
   for (int i = 0; i < cols; i++) {
-    printf("%c", cells[i].chars[0]);
+    fprintf(neotmux->log, "%c", cells[i].chars[0]);
   }
-  printf("\n");
+  fprintf(neotmux->log, "\n");
   return 0;
 }
 

@@ -12,22 +12,21 @@ bool is_inside_rect(VTermRect rect, VTermPos pos) {
 
 bool handle_mouse(int socket, char *buf, int read_size) {
   bool dirty = false;
-  printf("Mouse event (%d): ", socket);
+  fprintf(neotmux->log, "Mouse event (%d): ", socket);
 
   // Must be unsigned
   int b = (unsigned char)buf[4] & 0x03;
   int x = (unsigned char)buf[5] - 0x20;
   int y = (unsigned char)buf[6] - 0x20;
 
-  printf("%d, %d, %d\n", x, y, b);
-  fflush(stdout);
+  fprintf(neotmux->log, "%d, %d, %d\n", x, y, b);
 
   if (b == 0) {
-    printf("Left click\n");
+    fprintf(neotmux->log, "Left click\n");
     Window *w = get_current_window(neotmux);
     for (int i = 0; i < w->pane_count; i++) {
-      printf("Checking pane %d\n", i);
-      printf("  %d, %d, %d, %d\n", w->panes[i].col, w->panes[i].row,
+      fprintf(neotmux->log, "Checking pane %d\n", i);
+      fprintf(neotmux->log, "  %d, %d, %d, %d\n", w->panes[i].col, w->panes[i].row,
              w->panes[i].width, w->panes[i].height);
       Pane *p = &w->panes[i];
       VTermRect rect = {.start_col = p->col,
@@ -36,7 +35,7 @@ bool handle_mouse(int socket, char *buf, int read_size) {
                         .end_row = p->row + p->height};
       VTermPos pos = {.col = x - 1, .row = y - 1};
       if (is_inside_rect(rect, pos)) {
-        printf("Found pane %d\n", i);
+        fprintf(neotmux->log, "Found pane %d\n", i);
         w->current_pane = i;
         dirty = true;
         break;
