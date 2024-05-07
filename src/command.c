@@ -5,6 +5,7 @@
 #include "layout.h"
 #include "move.h"
 #include "pane.h"
+#include "plugin.h"
 #include "print_session.h"
 #include "render.h"
 #include "session.h"
@@ -76,6 +77,8 @@ void handle_command(int socket, char *buf, int read_size) {
   printf("Command (%d): %s\n", socket, cmd);
 
   if (strcmp(cmd, "Init") == 0) {
+    load_plugins();
+
     Session *s = add_session(neotmux, "Main");
     Window *w = add_window(s, "Main");
 
@@ -221,10 +224,9 @@ void handle_command(int socket, char *buf, int read_size) {
     free(session->title);
     char *title = strdup(cmd + 14);
     session->title = title;
-  } else if (strcmp(cmd, "Reload") == 0) {
-    close(socket);
-    exit(EXIT_SUCCESS);
+  } else if (strcmp(cmd, "ReloadLua") == 0) {
+    load_plugins();
   } else {
-    printf("Unhandled command (%d): %s\n", socket, cmd);
+    fprintf(neotmux->log, "Unhandled command (%d): %s\n", socket, cmd);
   }
 }

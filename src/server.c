@@ -13,7 +13,6 @@
 #include "command.h"
 #include "connection.h"
 #include "mouse.h"
-#include "plugin.h"
 #include "session.h"
 
 bool dirty = true; // TODO: Dirty should be on a per-pane basis
@@ -297,53 +296,6 @@ int init_ntmux() {
   bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));
   neotmux->barPos = BAR_NONE;
   neotmux->statusBarIdx = 0;
-  neotmux->lua = luaL_newstate();
-  luaL_openlibs(neotmux->lua); // What does this do?
-  char *lua = "print('Lua initialized')";
-  luaL_dostring(neotmux->lua, lua);
-
-  char *home = getenv("HOME");
-  char dotfile[PATH_MAX];
-  snprintf(dotfile, PATH_MAX, "%s/.ntmux.lua", home);
-
-  if (!load_plugin(neotmux->lua, "lua/default.lua")) {
-    return EXIT_FAILURE;
-  }
-
-  {
-    printf("Loading plugins\n");
-    char *home = getenv("HOME");
-    char plugins[PATH_MAX];
-    snprintf(plugins, PATH_MAX, "%s/.ntmux/plugins", home);
-
-    DIR *dir = opendir(plugins);
-    if (dir) {
-      struct dirent *entry;
-      while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_DIR && entry->d_name[0] != '.') {
-          printf("Loading plugin: %s\n", entry->d_name);
-          size_t size = strlen(plugins) + strlen(entry->d_name) + 11;
-          if (size > PATH_MAX) {
-            fprintf(stderr, "Path too long\n");
-            continue;
-          }
-          char path[size];
-          snprintf(path, size, "%s/%s/init.lua", plugins, entry->d_name);
-          load_plugin(neotmux->lua, path);
-        }
-      }
-
-      closedir(dir);
-    }
-  }
-
-  if (!load_plugin(neotmux->lua, dotfile)) {
-    return EXIT_FAILURE;
-  }
-
-  if (!load_plugin(neotmux->lua, "lua/init.lua")) {
-    return EXIT_FAILURE;
-  }
 
   return EXIT_SUCCESS;
 }

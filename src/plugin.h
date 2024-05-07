@@ -3,6 +3,6 @@
 
 #include <lua5.4/lua.h>
 
-bool load_plugin(lua_State *L, const char *filename);
+bool load_plugins();
 
 #endif

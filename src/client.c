@@ -216,7 +216,7 @@ void handle_events(int sock) {
       handle_binding(n, buf, sock, "cList", "i");
       handle_binding(n, buf, sock, "cCycleStatus", "y");
       handle_binding(n, buf, sock, "cCreate", "e");
-      handle_binding(n, buf, sock, "cReload", "r");
+      handle_binding(n, buf, sock, "cReloadLua", "r");
       handle_binding(n, buf, sock, "cLeft", "h");
       handle_binding(n, buf, sock, "cDown", "j");
       handle_binding(n, buf, sock, "cUp", "k");
