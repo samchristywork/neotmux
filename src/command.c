@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "layout.h"
 #include "move.h"
@@ -121,7 +122,11 @@ void handle_command(int socket, char *buf, int read_size) {
     Window *currentWindow = get_current_window(neotmux);
     calculate_layout(currentWindow);
   } else if (strcmp(cmd, "RenderScreen") == 0) {
+    clock_t start = clock();
     render_screen(socket);
+    clock_t end = clock();
+    float renderTime = (float)(end - start) / CLOCKS_PER_SEC * 1000;
+    fprintf(neotmux->log, "Render took %f ms\n", renderTime);
   } else if (strcmp(cmd, "RenderBar") == 0) {
     render_bar(socket);
   } else if (strcmp(cmd, "Layout") == 0) {
