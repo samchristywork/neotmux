@@ -219,6 +219,23 @@ void handle_command(int socket, char *buf, int read_size) {
   } else if (strcmp(cmd, "ScrollDown") == 0) {
     Pane *p = get_current_pane(neotmux);
     vterm_keyboard_unichar(p->process->vt, VTERM_KEY_DOWN, 0);
+  } else if (memcmp(cmd, "CreateNamed", 11) == 0) {
+    Session *session = get_current_session(neotmux);
+    if (session == NULL) {
+      return;
+    }
+
+    char *title = strdup(cmd + 12);
+    Window *window = add_window(session, title);
+
+    Window *w = get_current_window(neotmux);
+    window->width = w->width;
+    window->height = w->height;
+    add_pane(window);
+    session->current_window = session->window_count - 1;
+
+    Window *currentWindow = get_current_window(neotmux);
+    calculate_layout(currentWindow);
   } else if (memcmp(cmd, "RenameWindow", 12) == 0) {
     Window *window = get_current_window(neotmux);
     free(window->title);
