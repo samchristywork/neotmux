@@ -75,6 +75,8 @@ int handle_push_line(int cols, const VTermScreenCell *cells, void *user) {
   memcpy(line->cells, cells, cols * sizeof(VTermScreenCell));
   process->scrollback.size++;
 
+  // print_scrollback_buffer(&process->scrollback);
+
   return 0;
 }
 

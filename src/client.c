@@ -179,7 +179,7 @@ bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
       return true;
     }
     lua_pop(L, 1);
-  } else if(mode == MODE_NORMAL) {
+  } else if (mode == MODE_NORMAL) {
     lua_getglobal(L, "handle_binding_normal");
     if (!lua_isfunction(L, -1)) {
       lua_pop(L, 1);

@@ -2,10 +2,10 @@
 #include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
 #include <stdio.h>
+#include <sys/resource.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/time.h>
-#include <sys/resource.h>
 
 #include "border.h"
 #include "render.h"
@@ -120,8 +120,11 @@ void draw_pane(Pane *pane, Window *window) {
     int paneRow = row + scroll;
     if (paneRow >= 0) {
       draw_row(paneRow, windowRow, pane);
+    } else {
+      draw_history_row(-paneRow, windowRow, pane);
     }
   }
+  // draw_bar(pane, window);
 }
 
 void draw_floating_window(FloatingWindow *floatingWindow, Window *window) {

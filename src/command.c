@@ -245,6 +245,8 @@ void handle_command(int socket, char *buf, int read_size) {
       w->zoom = -1;
     }
     calculate_layout(w);
+  } else if (strcmp(cmd, "Log") == 0) {
+    printf("Log\n");
   } else if (strcmp(cmd, "ScrollUp") == 0) {
     Pane *p = get_current_pane(neotmux);
     p->process->scrolloffset += 1;

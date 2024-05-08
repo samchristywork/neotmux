@@ -115,6 +115,17 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  if (getenv("NTMUX") != NULL) {
+    fprintf(stderr, "Cannot run Ntmux inside Ntmux\n\n");
+    usage(argv[0]);
+    exit(EXIT_FAILURE);
+  }
+
+  if (setenv("NTMUX", "true", 1) != 0) {
+    perror("setenv");
+    exit(EXIT_FAILURE);
+  }
+
   if (client_mode && server_mode) {
     fprintf(stderr, "Cannot run in both client and server mode\n\n");
     usage(argv[0]);

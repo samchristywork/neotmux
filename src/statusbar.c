@@ -119,7 +119,8 @@ bool write_cursor_position() {
       cursorPos.row++;
     }
 
-    if (cursorPos.row < 0 || cursorPos.row >= currentPane->height + currentPane->row) {
+    if (cursorPos.row < 0 ||
+        cursorPos.row >= currentPane->height + currentPane->row) {
       buf_write("\033[?25l", 6); // Hide cursor
       return false;
     } else {
