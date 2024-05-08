@@ -106,5 +106,34 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  if (client_mode && server_mode) {
+    fprintf(stderr, "Cannot run in both client and server mode\n\n");
+    usage(argv[0]);
+  } else if (client_mode && !server_mode) {
+    int sock = init_client(name);
+    return start_client(sock);
+  } else if (!client_mode && server_mode) {
+    int sock = init_server(name);
+    return start_server(sock, name);
+  } else if (!client_mode && !server_mode) {
+    pid_t pid = fork();
+    if (pid == 0) {
+      // Child process
+      int sock = init_server(name);
+      signal(SIGINT, handle_ctrl_c);
+      close(0);
+      close(1);
+      close(2);
+      return start_server(sock, name);
+    } else if (pid > 0) {
+      // Parent process
+      int sock = init_client(name);
+      return start_client(sock);
+    } else {
+      perror("fork");
+      return EXIT_FAILURE;
+    }
+  }
+
   usage(argv[0]);
 }
