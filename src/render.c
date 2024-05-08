@@ -4,10 +4,14 @@
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "border.h"
+#include "render.h"
 #include "render_cell.h"
 #include "session.h"
+#include "statusbar.h"
 
 extern Neotmux *neotmux;
 
@@ -52,6 +56,86 @@ void draw_pane(Pane *pane, Window *window) {
       VTermScreenCell cell = {0};
       vterm_screen_get_cell(vts, pos, &cell);
       draw_cell(cell);
+    }
+  }
+}
+
+void draw_row(int paneRow, int windowRow, Pane *pane) {
+  write_position(windowRow + 1, pane->col + 1);
+
+  for (int col = pane->col; col < pane->col + pane->width; col++) {
+    VTermPos pos;
+    pos.row = paneRow;
+    pos.col = col - pane->col;
+    VTermScreen *vts = pane->process->vts;
+
+    VTermScreenCell cell = {0};
+    vterm_screen_get_cell(vts, pos, &cell);
+    draw_cell(cell);
+  }
+}
+
+VTermScreenCell *get_history_cell(ScrollBackLines scrollback, int row,
+                                  int col) {
+  row = scrollback.size - row;
+  if (row < 0 || row >= scrollback.size) {
+    return NULL;
+  }
+
+  ScrollBackLine *line = &scrollback.buffer[row];
+  if (col < 0 || col >= line->cols) {
+    return NULL;
+  }
+
+  return &line->cells[col];
+}
+
+void draw_history_row(int paneRow, int windowRow, Pane *pane) {
+  write_position(windowRow + 1, pane->col + 1);
+
+  for (int col = pane->col; col < pane->col + pane->width; col++) {
+    ScrollBackLines sb = pane->process->scrollback;
+    VTermScreenCell *cell = get_history_cell(sb, paneRow, col - pane->col);
+    if (cell) {
+      draw_cell(*cell);
+    } else {
+      buf_write(" ", 1);
+    }
+  }
+}
+
+void draw_bar(Pane *pane, Window *window) {
+  int row = pane->row + pane->height - 1;
+  write_position(row + 1, pane->col + 1);
+  char *str = get_pane_bar(pane);
+  for (int col = 0; col < pane->width; col++) {
+    VTermScreenCell cell = {0};
+    if (col < strlen(str)) {
+      cell.chars[0] = str[col];
+    } else {
+      cell.chars[0] = ' ';
+    }
+    cell.bg.type = VTERM_COLOR_DEFAULT_BG;
+    cell.bg.indexed.idx = 0;
+    cell.fg.type = VTERM_COLOR_INDEXED;
+    cell.fg.indexed.idx = 7;
+    draw_cell(cell);
+  }
+  free(str);
+}
+
+void draw_pane(Pane *pane, Window *window) {
+  clear_style();
+  for (int row = 0; row < pane->height; row++) {
+    int windowRow = pane->row + row;
+    if (windowRow < 0 || windowRow >= window->height) {
+      continue;
+    }
+
+    int scroll = pane->process->scrolloffset;
+    int paneRow = row + scroll;
+    if (paneRow >= 0) {
+      draw_row(paneRow, windowRow, pane);
     }
   }
 }
@@ -128,9 +212,10 @@ void render_screen(int fd) {
     vterm_screen_reset(vts, 1);
     vterm_screen_set_callbacks(vts, &callbacks, NULL);
 
-    char *data = read_file("dosascii");
+    // char *data = read_file("dosascii");
+    char *data = "Test";
     vterm_input_write(vt, data, strlen(data));
-    free(data);
+    // free(data);
     floatingWindow->vt = vt;
     floatingWindow->vts = vts;
   }
@@ -172,4 +257,12 @@ void render_screen(int fd) {
   draw_floating_window(floatingWindow, currentWindow);
 
   write(fd, neotmux->bb.buffer, neotmux->bb.n);
+}
+
+void render(int fd, RenderType type) {
+  if (type == RENDER_SCREEN) {
+    render_screen(fd);
+  } else if (type == RENDER_BAR) {
+    render_bar(fd);
+  }
 }

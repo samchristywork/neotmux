@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "layout.h"
 #include "move.h"
@@ -10,7 +10,6 @@
 #include "print_session.h"
 #include "render.h"
 #include "session.h"
-#include "statusbar.h"
 
 extern Neotmux *neotmux;
 
@@ -70,6 +69,13 @@ Session *add_session(Neotmux *neotmux, char *title) {
   return session;
 }
 
+// TODO: Move to module
+void swap_panes(Window *w, int a, int b) {
+  Pane tmp = w->panes[a];
+  w->panes[a] = w->panes[b];
+  w->panes[b] = tmp;
+}
+
 void handle_command(int socket, char *buf, int read_size) {
   char cmd[read_size];
   memcpy(cmd, buf + 1, read_size - 1);
@@ -123,12 +129,12 @@ void handle_command(int socket, char *buf, int read_size) {
     calculate_layout(currentWindow);
   } else if (strcmp(cmd, "RenderScreen") == 0) {
     clock_t start = clock();
-    render_screen(socket);
+    render(socket, RENDER_SCREEN);
     clock_t end = clock();
     float renderTime = (float)(end - start) / CLOCKS_PER_SEC * 1000;
     fprintf(neotmux->log, "Render took %f ms\n", renderTime);
   } else if (strcmp(cmd, "RenderBar") == 0) {
-    render_bar(socket);
+    render(socket, RENDER_BAR);
   } else if (strcmp(cmd, "Layout") == 0) {
     // TODO: Fix
     // if (session->current_window > 0 &&
@@ -206,6 +212,8 @@ void handle_command(int socket, char *buf, int read_size) {
     w->layout = LAYOUT_CUSTOM;
     calculate_layout(w);
   } else if (strcmp(cmd, "Zoom") == 0) {
+    // TODO: Fix the issue where mouse events are not being sent to the zoomed
+    // window
     Window *w = get_current_window(neotmux);
     if (w->zoom == -1) {
       w->zoom = w->current_pane;
