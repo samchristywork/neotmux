@@ -49,6 +49,28 @@ int init_client(char *name) {
   return sock;
 }
 
+int init_server(char *name) {
+  mkdir("/tmp/ntmux-1000", 0777);
+
+  int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (sock == -1) {
+    fprintf(stderr, "Could not create socket");
+    exit(EXIT_FAILURE);
+  }
+
+  struct sockaddr_un server;
+  server.sun_family = AF_UNIX;
+  snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock",
+           name);
+
+  if (bind(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
+    puts("bind failed");
+    exit(EXIT_FAILURE);
+  }
+
+  return sock;
+}
+
 int main(int argc, char *argv[]) {
   add_arg('c', "client", "Run Ntmux in client mode", ARG_NONE);
   add_arg('i', "inet", "Use INET sockets", ARG_NONE);
