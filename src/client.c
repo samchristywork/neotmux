@@ -1,4 +1,7 @@
 #include <arpa/inet.h>
+#include <lua5.4/lauxlib.h>
+#include <lua5.4/lua.h>
+#include <lua5.4/lualib.h>
 #include <pthread.h>
 #include <readline/readline.h>
 #include <signal.h>
@@ -14,7 +17,7 @@
 #include <unistd.h>
 
 struct termios term;
-enum Mode { MODE_NORMAL, MODE_CONTROL, MODE_CONTROL_STICKY };
+typedef enum Mode { MODE_NORMAL, MODE_CONTROL, MODE_CONTROL_STICKY } Mode;
 fd_set fds;
 
 // Write a u32 representing the size of the message followed by the message
@@ -141,11 +144,70 @@ void handle_rename(int sock, char *prompt, char *default_name, char *command) {
   enter_raw_mode();
 }
 
+lua_State *L = NULL;
+bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
+  if (!L) {
+    char *filename = "bindings.lua";
+    struct stat buffer;
+    if (stat(filename, &buffer) == 0) {
+      L = luaL_newstate();
+      luaL_openlibs(L);
+      luaL_dofile(L, filename);
+    }
+  }
+
+  if (!L) {
+    return false;
+  }
+
+  if (mode == MODE_CONTROL) {
+    lua_getglobal(L, "handle_binding_control");
+    if (!lua_isfunction(L, -1)) {
+      lua_pop(L, 1);
+      return false;
+    }
+
+    char cmd[numRead + 1];
+    memcpy(cmd, buf + 1, numRead);
+    cmd[numRead] = '\0';
+    lua_pushstring(L, cmd);
+    lua_call(L, 1, 1);
+    if (lua_isstring(L, -1)) {
+      const char *command = lua_tostring(L, -1);
+      write_message(sock, (char *)command, strlen(command));
+      lua_pop(L, 1);
+      return true;
+    }
+    lua_pop(L, 1);
+  } else if(mode == MODE_NORMAL) {
+    lua_getglobal(L, "handle_binding_normal");
+    if (!lua_isfunction(L, -1)) {
+      lua_pop(L, 1);
+      return false;
+    }
+
+    char cmd[numRead + 1];
+    memcpy(cmd, buf + 1, numRead);
+    cmd[numRead] = '\0';
+    lua_pushstring(L, cmd);
+    lua_call(L, 1, 1);
+    if (lua_isstring(L, -1)) {
+      const char *command = lua_tostring(L, -1);
+      write_message(sock, (char *)command, strlen(command));
+      lua_pop(L, 1);
+      return true;
+    }
+    lua_pop(L, 1);
+  }
+
+  return false;
+}
+
 void handle_events(int sock) {
   rl_startup_hook = (rl_hook_func_t *)add_readline_history;
   enter_raw_mode();
 
-  int mode = MODE_NORMAL;
+  Mode mode = MODE_NORMAL;
   char buf[32];
   buf[0] = 'e';
   while (1) {
@@ -155,21 +217,11 @@ void handle_events(int sock) {
     }
 
     if (mode == MODE_NORMAL) {
-      // Alt+hjkl
-      if (n == 2 && buf[1] == 27 && buf[2] == 'h') {
-        write_message(sock, "cLeft", 5);
-      } else if (n == 2 && buf[1] == 27 && buf[2] == 'l') {
-        write_message(sock, "cRight", 6);
-      } else if (n == 2 && buf[1] == 27 && buf[2] == 'k') {
-        write_message(sock, "cUp", 3);
-      } else if (n == 2 && buf[1] == 27 && buf[2] == 'j') {
-        write_message(sock, "cDown", 5);
+      if (handle_lua_binding(n, buf, sock, MODE_NORMAL)) {
       } else if (n == 2 && buf[1] == 27 && buf[2] == ',') {
         write_message(sock, "cPrev", 5);
       } else if (n == 2 && buf[1] == 27 && buf[2] == '.') {
         write_message(sock, "cNext", 5);
-      } else if (n == 2 && buf[1] == 27 && buf[2] == 'z') {
-        write_message(sock, "cZoom", 5);
       } else if (n == 1 && buf[1] == 1) { // Ctrl-A
         mode = MODE_CONTROL;
       } else if (n == 1 && buf[1] == 10) { // Enter
@@ -179,34 +231,12 @@ void handle_events(int sock) {
         write_message(sock, buf, n + 1);
       }
     } else if (mode == MODE_CONTROL || mode == MODE_CONTROL_STICKY) {
+      // TODO: Detect and ignore mouse events
       // TODO: Change to lua
-      handle_binding(n, buf, sock, "cSplit", "|");
-      handle_binding(n, buf, sock, "cVSplit", "_");
-      handle_binding(n, buf, sock, "cSplit", "\"");
-      handle_binding(n, buf, sock, "cVSplit", "%");
-      handle_binding(n, buf, sock, "cList", "i");
-      handle_binding(n, buf, sock, "cCycleStatus", "y");
-      handle_binding(n, buf, sock, "cCreate", "e");
-      handle_binding(n, buf, sock, "cReloadLua", "r");
-      handle_binding(n, buf, sock, "cLeft", "h");
-      handle_binding(n, buf, sock, "cDown", "j");
-      handle_binding(n, buf, sock, "cUp", "k");
-      handle_binding(n, buf, sock, "cRight", "l");
-      handle_binding(n, buf, sock, "cZoom", "z");
-      handle_binding(n, buf, sock, "cEven_Horizontal", "1");
-      handle_binding(n, buf, sock, "cEven_Vertical", "2");
-      handle_binding(n, buf, sock, "cMain_Horizontal", "3");
-      handle_binding(n, buf, sock, "cMain_Vertical", "4");
-      handle_binding(n, buf, sock, "cTiled", "5");
-      handle_binding(n, buf, sock, "cCustom", "6");
-      handle_binding(n, buf, sock, "cNext", "n");
-      handle_binding(n, buf, sock, "cPrev", "p");
       handle_binding(n, buf, sock, "cScrollUp", "\033[5~");   // Page up
       handle_binding(n, buf, sock, "cScrollDown", "\033[6~"); // Page down
-      handle_binding(n, buf, sock, "cLeft", "\033[D");        // Left
-      handle_binding(n, buf, sock, "cRight", "\033[C");       // Right
-      handle_binding(n, buf, sock, "cUp", "\033[A");          // Up
-      handle_binding(n, buf, sock, "cDown", "\033[B");        // Down
+
+      handle_lua_binding(n, buf, sock, MODE_CONTROL);
 
       if (n == 1 && buf[1] == 'c') {
         handle_rename(sock, "Name of New Window: ", "", "cCreateNamed");

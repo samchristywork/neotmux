@@ -65,10 +65,11 @@ void print_process_cwd(pid_t pid) {
 
 void print_cursor(Cursor *cursor) {
   fprintf(neotmux->log, "          mouse_active: %s\n",
-         cursor->mouse_active ? "True" : "False");
+          cursor->mouse_active ? "True" : "False");
   fprintf(neotmux->log, "          shape: ");
   print_cursor_shape(cursor->shape);
-  fprintf(neotmux->log, "          visible: %s\n", cursor->visible ? "True" : "False");
+  fprintf(neotmux->log, "          visible: %s\n",
+          cursor->visible ? "True" : "False");
 }
 
 void print_process(Process *process) {
@@ -76,7 +77,8 @@ void print_process(Process *process) {
     fprintf(neotmux->log, "      Process: %s\n", process->name);
     fprintf(neotmux->log, "        pid: %d\n", process->pid);
     fprintf(neotmux->log, "        fd: %d\n", process->fd);
-    fprintf(neotmux->log, "        closed: %s\n", process->closed ? "True" : "False");
+    fprintf(neotmux->log, "        closed: %s\n",
+            process->closed ? "True" : "False");
     fprintf(neotmux->log, "        cursor:\n");
     print_cursor(&process->cursor);
     print_process_cwd(process->pid);
