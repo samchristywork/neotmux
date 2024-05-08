@@ -42,13 +42,39 @@ int handle_term_prop(VTermProp prop, VTermValue *val, void *user) {
   return 0;
 }
 
-int handle_push_line(int cols, const VTermScreenCell *cells, void *user) {
-  // TODO: Copy these lines into scrollback buffer
-  fprintf(neotmux->log, "Cols: %d\n", cols);
-  for (int i = 0; i < cols; i++) {
-    fprintf(neotmux->log, "%c", cells[i].chars[0]);
+void print_scrollback_buffer(ScrollBackLines *scrollback_lines) {
+  for (int i = 0; i < scrollback_lines->size; i++) {
+    ScrollBackLine *line = &scrollback_lines->buffer[i];
+    printf("%d:", i);
+    for (int j = 0; j < line->cols; j++) {
+      printf("%c", line->cells[j].chars[0]);
+    }
+    printf("\n");
   }
-  fprintf(neotmux->log, "\n");
+}
+
+int handle_push_line(int cols, const VTermScreenCell *cells, void *user) {
+  Process *process = (Process *)user;
+
+  if (process->scrollback.size == 0) {
+    process->scrollback.capacity = 10;
+    process->scrollback.buffer =
+        malloc(process->scrollback.capacity * sizeof(ScrollBackLine));
+  }
+
+  if (process->scrollback.size == process->scrollback.capacity) {
+    process->scrollback.capacity *= 2;
+    process->scrollback.buffer =
+        realloc(process->scrollback.buffer,
+                process->scrollback.capacity * sizeof(ScrollBackLine));
+  }
+
+  ScrollBackLine *line = &process->scrollback.buffer[process->scrollback.size];
+  line->cols = cols;
+  line->cells = malloc(cols * sizeof(VTermScreenCell));
+  memcpy(line->cells, cells, cols * sizeof(VTermScreenCell));
+  process->scrollback.size++;
+
   return 0;
 }
 
@@ -108,6 +134,11 @@ void add_process_to_pane(Pane *pane) {
     execlp(shell, shell, (char *)NULL);
     exit(EXIT_FAILURE);
   }
+
+  pane->process->scrollback.size = 0;
+  pane->process->scrollback.capacity = 0;
+  pane->process->scrollback.buffer = NULL;
+  pane->process->scrolloffset = 0;
 
   pane->process->pid = childPid;
   pane->process->name = malloc(strlen(childName) + 1);
