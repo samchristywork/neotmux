@@ -24,6 +24,17 @@ typedef struct Cursor {
   bool mouse_active;
 } Cursor;
 
+typedef struct ScrollBackLine {
+  int cols;
+  VTermScreenCell *cells;
+} ScrollBackLine;
+
+typedef struct ScrollBackLines {
+  ScrollBackLine *buffer;
+  size_t size;
+  size_t capacity;
+} ScrollBackLines;
+
 typedef struct Process {
   char *name;
   int pid;
@@ -32,6 +43,8 @@ typedef struct Process {
   VTermScreen *vts;
   Cursor cursor;
   bool closed;
+  ScrollBackLines scrollback;
+  int scrolloffset;
 } Process;
 
 typedef struct Pane {
