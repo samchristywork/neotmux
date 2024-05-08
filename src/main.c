@@ -14,11 +14,18 @@
 
 #define VERSION_STRING "neotmux-1.0.0"
 
-#define LICENSE_STRING "Copyright (C) 2024 Sam Christy.\n" \
-"License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n" \
-"\n" \
-"This is free software; you are free to change and redistribute it.\n" \
-"There is NO WARRANTY, to the extent permitted by law."
+#define LICENSE_STRING                                                         \
+  "Copyright (C) 2024 Sam Christy.\n"                                          \
+  "License GPLv3+: GNU GPL version 3 or later "                                \
+  "<http://gnu.org/licenses/gpl.html>\n"                                       \
+  "\n"                                                                         \
+  "This is free software; you are free to change and redistribute it.\n"       \
+  "There is NO WARRANTY, to the extent permitted by law."
+
+void handle_ctrl_c(int sig) {
+  signal(SIGINT, handle_ctrl_c);
+  // die("Ctrl-C");
+}
 
 int init_client(char *name) {
   mkdir("/tmp/ntmux-1000", 0777);
@@ -80,6 +87,7 @@ int main(int argc, char *argv[]) {
   add_arg('u', "unix", "Use UNIX sockets (default)", ARG_NONE);
   add_arg('h', "help", "Show this help message", ARG_NONE);
   add_arg('v', "version", "Show the version number and license info", ARG_NONE);
+  add_arg('l', "log", "Log file to use (default \"ntmux.log\")", ARG_REQUIRED);
 
   bool help = get_arg_bool(argc, argv, 'h', false);
   bool version = get_arg_bool(argc, argv, 'v', false);
@@ -88,6 +96,7 @@ int main(int argc, char *argv[]) {
   bool use_inet = get_arg_bool(argc, argv, 'i', false);
   bool use_unix = get_arg_bool(argc, argv, 'u', true);
   char *name = get_arg_string(argc, argv, 'n', "local");
+  char *log_filename = get_arg_string(argc, argv, 'l', "ntmux.log");
   int port = get_arg_int(argc, argv, 'p', 5097);
 
   if (version) {
@@ -114,7 +123,8 @@ int main(int argc, char *argv[]) {
     return start_client(sock);
   } else if (!client_mode && server_mode) {
     int sock = init_server(name);
-    return start_server(sock, name);
+    // TODO: Remember to remove the socket file
+    return start_server(sock, name, log_filename);
   } else if (!client_mode && !server_mode) {
     pid_t pid = fork();
     if (pid == 0) {
@@ -124,7 +134,7 @@ int main(int argc, char *argv[]) {
       close(0);
       close(1);
       close(2);
-      return start_server(sock, name);
+      return start_server(sock, name, log_filename);
     } else if (pid > 0) {
       // Parent process
       int sock = init_client(name);

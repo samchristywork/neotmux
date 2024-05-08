@@ -232,7 +232,8 @@ void *handle_client(void *socket_desc) {
           static char buf[1000];
           int read_size = read(p->process->fd, buf, 1000);
           if (read_size == 0) {
-            fprintf(neotmux->log, "Process disconnected (%d)\n", p->process->fd);
+            fprintf(neotmux->log, "Process disconnected (%d)\n",
+                    p->process->fd);
             exit(EXIT_FAILURE);
           } else if (read_size == -1) {
             p->process->closed = true;
@@ -277,9 +278,9 @@ void *handle_client(void *socket_desc) {
   return 0;
 }
 
-int init_ntmux() {
+int init_ntmux(char *log_filename) {
   neotmux = malloc(sizeof(*neotmux));
-  neotmux->log = fopen("/tmp/ntmux.log", "w+");
+  neotmux->log = fopen(log_filename, "w+");
   neotmux->sessions = NULL;
   neotmux->session_count = 0;
   neotmux->current_session = 0;
@@ -293,7 +294,7 @@ int init_ntmux() {
 }
 
 char *sockname;
-void cleanup() {
+void handle_cleanup() {
   struct sockaddr_un server;
   snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock",
            sockname);
@@ -301,12 +302,12 @@ void cleanup() {
   fclose(neotmux->log);
 }
 
-void start_server_loop(int socket_desc) {
+void start_server_loop(int socket_desc, char *log_filename) {
   die_socket_desc = socket_desc;
 
-  atexit(cleanup);
+  atexit(handle_cleanup);
 
-  if (init_ntmux() == EXIT_FAILURE) {
+  if (init_ntmux(log_filename) == EXIT_FAILURE) {
     return;
   }
 
@@ -321,11 +322,11 @@ void start_server_loop(int socket_desc) {
   }
 }
 
-int start_server(int sock, char *name) {
+int start_server(int sock, char *name, char *log_filename) {
   sockname = name;
   printf("Sockname: %s\n", name);
 
-  start_server_loop(sock);
+  start_server_loop(sock, log_filename);
 
   return EXIT_SUCCESS;
 }
