@@ -43,23 +43,6 @@ void clear_style() {
   buf_write("\033[0m", 4); // Reset style
 }
 
-void draw_pane(Pane *pane, Window *window) {
-  clear_style();
-  for (int row = pane->row; row < pane->row + pane->height; row++) {
-    write_position(row + 1, pane->col + 1);
-    for (int col = pane->col; col < pane->col + pane->width; col++) {
-      VTermPos pos;
-      pos.row = row - pane->row;
-      pos.col = col - pane->col;
-      VTermScreen *vts = pane->process->vts;
-
-      VTermScreenCell cell = {0};
-      vterm_screen_get_cell(vts, pos, &cell);
-      draw_cell(cell);
-    }
-  }
-}
-
 void draw_row(int paneRow, int windowRow, Pane *pane) {
   write_position(windowRow + 1, pane->col + 1);
 
@@ -90,6 +73,7 @@ VTermScreenCell *get_history_cell(ScrollBackLines scrollback, int row,
   return &line->cells[col];
 }
 
+// TODO: Add scrollback module
 void draw_history_row(int paneRow, int windowRow, Pane *pane) {
   write_position(windowRow + 1, pane->col + 1);
 

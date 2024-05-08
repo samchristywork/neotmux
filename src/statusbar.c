@@ -106,21 +106,29 @@ void write_status_bar(int cols) {
   int n = snprintf(buf, 32, "\033[%d;%dH", row, col);                          \
   buf_write(buf, n);
 
-void write_cursor_position() {
+bool write_cursor_position() {
   VTermPos cursorPos;
   Pane *currentPane = get_current_pane(neotmux);
   if (currentPane) {
     VTermState *state = vterm_obtain_state(currentPane->process->vt);
     vterm_state_get_cursorpos(state, &cursorPos);
-    cursorPos.row += currentPane->row;
+    cursorPos.row += currentPane->row - currentPane->process->scrolloffset;
     cursorPos.col += currentPane->col;
 
     if (neotmux->barPos == BAR_TOP) {
       cursorPos.row++;
     }
 
-    write_position(cursorPos.row + 1, cursorPos.col + 1);
+    if (cursorPos.row < 0 || cursorPos.row >= currentPane->height + currentPane->row) {
+      buf_write("\033[?25l", 6); // Hide cursor
+      return false;
+    } else {
+      write_position(cursorPos.row + 1, cursorPos.col + 1);
+      return true;
+    }
   }
+
+  return false;
 }
 
 void write_cursor_style() {
@@ -164,8 +172,10 @@ void render_bar(int fd) {
     write_status_bar(cols);
   }
 
-  write_cursor_position();
-  write_cursor_style();
+  bool show_cursor = write_cursor_position();
+  if (show_cursor) {
+    write_cursor_style();
+  }
 
   write(fd, neotmux->bb.buffer, neotmux->bb.n);
 }
