@@ -175,6 +175,30 @@ void handle_command(int socket, char *buf, int read_size) {
     }
     Window *currentWindow = get_current_window(neotmux);
     calculate_layout(currentWindow);
+  } else if (strcmp(cmd, "SwapLeft") == 0) {
+    Window *w = get_current_window(neotmux);
+    int swap = move_active_pane(LEFT, w);
+    swap_panes(w, w->current_pane, swap);
+    w->current_pane = swap;
+    calculate_layout(w);
+  } else if (strcmp(cmd, "SwapRight") == 0) {
+    Window *w = get_current_window(neotmux);
+    int swap = move_active_pane(RIGHT, w);
+    swap_panes(w, w->current_pane, swap);
+    w->current_pane = swap;
+    calculate_layout(w);
+  } else if (strcmp(cmd, "SwapUp") == 0) {
+    Window *w = get_current_window(neotmux);
+    int swap = move_active_pane(UP, w);
+    swap_panes(w, w->current_pane, swap);
+    w->current_pane = swap;
+    calculate_layout(w);
+  } else if (strcmp(cmd, "SwapDown") == 0) {
+    Window *w = get_current_window(neotmux);
+    int swap = move_active_pane(DOWN, w);
+    swap_panes(w, w->current_pane, swap);
+    w->current_pane = swap;
+    calculate_layout(w);
   } else if (strcmp(cmd, "Left") == 0) {
     Window *w = get_current_window(neotmux);
     w->current_pane = move_active_pane(LEFT, w);
@@ -223,10 +247,10 @@ void handle_command(int socket, char *buf, int read_size) {
     calculate_layout(w);
   } else if (strcmp(cmd, "ScrollUp") == 0) {
     Pane *p = get_current_pane(neotmux);
-    vterm_keyboard_unichar(p->process->vt, VTERM_KEY_UP, 0);
+    p->process->scrolloffset += 1;
   } else if (strcmp(cmd, "ScrollDown") == 0) {
     Pane *p = get_current_pane(neotmux);
-    vterm_keyboard_unichar(p->process->vt, VTERM_KEY_DOWN, 0);
+    p->process->scrolloffset -= 1;
   } else if (memcmp(cmd, "CreateNamed", 11) == 0) {
     Session *session = get_current_session(neotmux);
     if (session == NULL) {
