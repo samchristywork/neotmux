@@ -20,6 +20,35 @@
 "This is free software; you are free to change and redistribute it.\n" \
 "There is NO WARRANTY, to the extent permitted by law."
 
+int init_client(char *name) {
+  mkdir("/tmp/ntmux-1000", 0777);
+
+  struct sockaddr_un server;
+  server.sun_family = AF_UNIX;
+  snprintf(server.sun_path, sizeof(server.sun_path), "/tmp/ntmux-1000/%s.sock",
+           name);
+  int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (sock == -1) {
+    perror("Could not create socket");
+    close(sock);
+    exit(EXIT_FAILURE);
+  }
+
+  printf("Connecting\n");
+  while (1) {
+    const useconds_t one_second = 1000000;
+    usleep(one_second / 10);
+    if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
+      perror("connect failed");
+    } else {
+      printf("Connected\n");
+      break;
+    }
+  }
+
+  return sock;
+}
+
 int main(int argc, char *argv[]) {
   add_arg('c', "client", "Run Ntmux in client mode", ARG_NONE);
   add_arg('i', "inet", "Use INET sockets", ARG_NONE);
