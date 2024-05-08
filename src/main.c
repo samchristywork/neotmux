@@ -115,6 +115,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  // TODO: Don't check for NTMUX if running only in server mode.
   if (getenv("NTMUX") != NULL) {
     fprintf(stderr, "Cannot run Ntmux inside Ntmux\n\n");
     usage(argv[0]);

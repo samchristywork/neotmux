@@ -88,25 +88,39 @@ void draw_history_row(int paneRow, int windowRow, Pane *pane) {
   }
 }
 
-void draw_bar(Pane *pane, Window *window) {
-  int row = pane->row + pane->height - 1;
-  write_position(row + 1, pane->col + 1);
-  char *str = get_pane_bar(pane);
-  for (int col = 0; col < pane->width; col++) {
-    VTermScreenCell cell = {0};
-    if (col < strlen(str)) {
-      cell.chars[0] = str[col];
-    } else {
-      cell.chars[0] = ' ';
-    }
-    cell.bg.type = VTERM_COLOR_DEFAULT_BG;
-    cell.bg.indexed.idx = 0;
-    cell.fg.type = VTERM_COLOR_INDEXED;
-    cell.fg.indexed.idx = 7;
-    draw_cell(cell);
-  }
-  free(str);
-}
+// int get_resource_usage(int pid) {
+//   struct rusage usage;
+//   getrusage(RUSAGE_CHILDREN, &usage);
+//   return usage.ru_maxrss;
+// }
+//
+// char *get_pane_bar(Pane *pane) {
+//   int usage = get_resource_usage(pane->process->pid);
+//
+//   char *str = malloc(pane->width);
+//   int n = snprintf(str, pane->width, "%s %d", pane->process->name, usage);
+//   return str;
+// }
+//
+// void draw_bar(Pane *pane, Window *window) {
+//   int row = pane->row + pane->height - 1;
+//   write_position(row + 1, pane->col + 1);
+//   char *str = get_pane_bar(pane);
+//   for (int col = 0; col < pane->width; col++) {
+//     VTermScreenCell cell = {0};
+//     if (col < strlen(str)) {
+//       cell.chars[0] = str[col];
+//     } else {
+//       cell.chars[0] = ' ';
+//     }
+//     cell.bg.type = VTERM_COLOR_DEFAULT_BG;
+//     cell.bg.indexed.idx = 0;
+//     cell.fg.type = VTERM_COLOR_INDEXED;
+//     cell.fg.indexed.idx = 7;
+//     draw_cell(cell);
+//   }
+//   free(str);
+// }
 
 void draw_pane(Pane *pane, Window *window) {
   clear_style();
