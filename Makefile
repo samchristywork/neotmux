@@ -1,3 +1,7 @@
+CC=gcc
+CFLAGS=-g
+LIBS=-lreadline -lvterm -llua5.4
+
 all: build/ntmux
 
 .PHONY: objects
@@ -5,15 +9,15 @@ objects: $(patsubst src/%.c, build/%.o, $(wildcard src/*.c))
 
 build/ntmux: src/*.c src/*.h objects
 	mkdir -p build
-	gcc build/*.o -o build/ntmux -lreadline -lvterm -llua5.4
+	${CC} ${CFLAGS} build/*.o -o build/ntmux ${LIBS}
 
 build/%.o: src/%.c src/*.h
 	mkdir -p build
-	gcc -c $< -o $@ -lreadline -lvterm -llua5.4
+	${CC} ${CFLAGS} -c $< -o $@ ${LIBS}
 
 simple:
 	mkdir -p build
-	gcc src/*.c -o build/ntmux -lreadline -lvterm -llua5.4
+	${CC} ${CFLAGS} src/*.c -o build/ntmux ${LIBS}
 
 run: build/ntmux
 	unset NTMUX && alacritty -e build/ntmux -n test
@@ -30,6 +34,9 @@ server: build/ntmux
 
 client: build/ntmux
 	unset NTMUX && alacritty -e build/ntmux -n distributed -c
+
+valgrind: build/ntmux
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=valgrind.log build/ntmux
 
 callgraph: build/ntmux
 	./scripts/callgraph
