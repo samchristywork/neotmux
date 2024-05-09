@@ -59,6 +59,7 @@ void draw_row(int paneRow, int windowRow, Pane *pane) {
     vterm_screen_get_cell(vts, pos, &cell);
     draw_cell(cell);
   }
+  clear_style();
 }
 
 VTermScreenCell *get_history_cell(ScrollBackLines scrollback, int row,
