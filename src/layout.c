@@ -4,8 +4,6 @@
 
 extern Neotmux *neotmux;
 
-// TODO: Change to lua
-
 bool call_lua_layout_function(lua_State *L, const char *function, int *col,
                               int *row, int *width, int *height, int index,
                               int nPanes, int winWidth, int winHeight) {
@@ -47,142 +45,13 @@ bool call_lua_layout_function(lua_State *L, const char *function, int *col,
     }                                                                          \
   }
 
-void apply_even_horizontal_layout(Window *w) {
-  Pane *panes = w->panes;
-
-  int remaining = w->width - w->pane_count + 1;
-  int col = 0;
-
-  for (int i = 0; i < w->pane_count; i++) {
-    panes[i].row = 0;
-    panes[i].col = col;
-    panes[i].height = w->height;
-    panes[i].width = remaining / (w->pane_count - i);
-
-    col += panes[i].width + 1;
-    remaining -= panes[i].width;
-  }
-
-  update_layout(w);
-}
-
-void apply_even_vertical_layout(Window *w) {
-  Pane *panes = w->panes;
-
-  int remaining = w->height - w->pane_count + 1;
-  int row = 0;
-
-  for (int i = 0; i < w->pane_count; i++) {
-    panes[i].row = row;
-    panes[i].col = 0;
-    panes[i].height = remaining / (w->pane_count - i);
-    panes[i].width = w->width;
-
-    row += panes[i].height + 1;
-    remaining -= panes[i].height;
-  }
-
-  update_layout(w);
-}
-
-void apply_main_horizontal_layout(Window *w) {
-  Pane *panes = w->panes;
-
-  if (w->pane_count <= 1) {
-    apply_even_vertical_layout(w);
-    return;
-  }
-
-  panes[0].row = 0;
-  panes[0].col = 0;
-  panes[0].height = w->height / 2;
-  panes[0].width = w->width;
-
-  int remaining = w->width;
-  for (int i = 1; i < w->pane_count; i++) {
-    panes[i].row = w->height / 2 + 1;
-    panes[i].col = w->width - remaining;
-    panes[i].height = w->height - panes[i].row;
-    panes[i].width = remaining / (w->pane_count - i);
-
-    remaining -= panes[i].width;
-    remaining--;
-  }
-
-  update_layout(w);
-}
-
-void apply_main_vertical_layout(Window *w) {
-  Pane *panes = w->panes;
-
-  if (w->pane_count <= 1) {
-    apply_even_horizontal_layout(w);
-    return;
-  }
-
-  panes[0].row = 0;
-  panes[0].col = 0;
-  panes[0].height = w->height;
-  panes[0].width = w->width / 2;
-
-  int remaining = w->height;
-  for (int i = 1; i < w->pane_count; i++) {
-    panes[i].row = w->height - remaining;
-    panes[i].col = w->width / 2 + 1;
-    panes[i].height = remaining / (w->pane_count - i);
-    panes[i].width = w->width - panes[i].col;
-
-    remaining -= panes[i].height;
-    remaining--;
-  }
-
-  update_layout(w);
-}
-
-void apply_tiled_layout(Window *w) {
-  Pane *panes = w->panes;
-
-  int rows = 1;
-  int cols = 1;
-
-  while (rows * cols < w->pane_count) {
-    if (w->width / (cols + 1) > w->height / (rows + 1)) {
-      cols++;
-    } else {
-      rows++;
-    }
-  }
-
-  int row = 0;
-  int col = 0;
-  int remaining = w->pane_count;
-
-  for (int i = 0; i < w->pane_count; i++) {
-    panes[i].row = row;
-    panes[i].col = col;
-    panes[i].height = w->height / rows;
-    panes[i].width = w->width / cols;
-
-    col += panes[i].width + 1;
-    remaining--;
-
-    if (remaining % cols == 0) {
-      row += panes[i].height + 1;
-      col = 0;
-    }
-  }
-
-  update_layout(w);
-}
-
-// TODO: Fix how borders work to make this look correct
-void apply_custom_layout(Window *w) {
+void apply_custom_layout(Window *w, char *name) {
   Pane *panes = w->panes;
 
   for (int i = 0; i < w->pane_count; i++) {
     int col, row, width, height;
-    if (call_lua_layout_function(neotmux->lua, "layout_custom", &col, &row,
-                                 &width, &height, i, w->pane_count, w->width,
+    if (call_lua_layout_function(neotmux->lua, name, &col, &row, &width,
+                                 &height, i, w->pane_count, w->width,
                                  w->height)) {
       panes[i].row = row;
       panes[i].col = col;
@@ -211,22 +80,23 @@ void calculate_layout(Window *window) {
       // TODO: Implement default layout
       break;
     case LAYOUT_EVEN_HORIZONTAL:
-      apply_even_horizontal_layout(window);
+      apply_custom_layout(window, "layout_even_horizontal");
       break;
     case LAYOUT_EVEN_VERTICAL:
-      apply_even_vertical_layout(window);
+      apply_custom_layout(window, "layout_even_vertical");
       break;
     case LAYOUT_MAIN_HORIZONTAL:
-      apply_main_horizontal_layout(window);
+      apply_custom_layout(window, "layout_main_horizontal");
       break;
     case LAYOUT_MAIN_VERTICAL:
-      apply_main_vertical_layout(window);
+      apply_custom_layout(window, "layout_main_vertical");
       break;
     case LAYOUT_TILED:
-      apply_tiled_layout(window);
+      //apply_tiled_layout(window);
       break;
     case LAYOUT_CUSTOM:
-      apply_custom_layout(window);
+      // TODO: Fix how borders work to make this look correct
+      apply_custom_layout(window, "layout_custom");
       break;
     default:
       break;

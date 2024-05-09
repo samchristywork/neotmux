@@ -42,17 +42,6 @@ int handle_term_prop(VTermProp prop, VTermValue *val, void *user) {
   return 0;
 }
 
-void print_scrollback_buffer(ScrollBackLines *scrollback_lines) {
-  for (int i = 0; i < scrollback_lines->size; i++) {
-    ScrollBackLine *line = &scrollback_lines->buffer[i];
-    printf("%d:", i);
-    for (int j = 0; j < line->cols; j++) {
-      printf("%c", line->cells[j].chars[0]);
-    }
-    printf("\n");
-  }
-}
-
 int handle_push_line(int cols, const VTermScreenCell *cells, void *user) {
   Process *process = (Process *)user;
 

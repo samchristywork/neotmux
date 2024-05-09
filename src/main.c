@@ -112,30 +112,31 @@ int main(int argc, char *argv[]) {
   if (use_inet && use_unix) {
     fprintf(stderr, "Cannot use both INET and UNIX sockets\n\n");
     usage(argv[0]);
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   // TODO: Don't check for NTMUX if running only in server mode.
   if (getenv("NTMUX") != NULL) {
     fprintf(stderr, "Cannot run Ntmux inside Ntmux\n\n");
     usage(argv[0]);
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   if (setenv("NTMUX", "true", 1) != 0) {
     perror("setenv");
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   if (client_mode && server_mode) {
     fprintf(stderr, "Cannot run in both client and server mode\n\n");
     usage(argv[0]);
+    return EXIT_FAILURE;
   } else if (client_mode && !server_mode) {
     int sock = init_client(name);
     return start_client(sock);
   } else if (!client_mode && server_mode) {
-    int sock = init_server(name);
     // TODO: Remember to remove the socket file
+    int sock = init_server(name);
     return start_server(sock, name, log_filename);
   } else if (!client_mode && !server_mode) {
     pid_t pid = fork();
@@ -158,4 +159,5 @@ int main(int argc, char *argv[]) {
   }
 
   usage(argv[0]);
+  return EXIT_FAILURE;
 }

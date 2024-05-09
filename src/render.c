@@ -44,6 +44,9 @@ void clear_style() {
 }
 
 void draw_row(int paneRow, int windowRow, Pane *pane) {
+  if (neotmux->barPos == BAR_TOP) {
+    windowRow += 1;
+  }
   write_position(windowRow + 1, pane->col + 1);
 
   for (int col = pane->col; col < pane->col + pane->width; col++) {
@@ -164,29 +167,6 @@ void draw_floating_window(FloatingWindow *floatingWindow, Window *window) {
   }
 }
 
-char *read_file(const char *filename) {
-  FILE *file = fopen(filename, "r");
-  if (!file) {
-    return NULL;
-  }
-
-  fseek(file, 0, SEEK_END);
-  long length = ftell(file);
-  fseek(file, 0, SEEK_SET);
-
-  char *buffer = malloc(length + 1);
-  if (!buffer) {
-    fclose(file);
-    return NULL;
-  }
-
-  fread(buffer, 1, length, file);
-  fclose(file);
-  buffer[length] = '\0';
-
-  return buffer;
-}
-
 void render_screen(int fd) {
   if (!floatingWindow) {
     floatingWindow = malloc(sizeof(FloatingWindow));
@@ -213,10 +193,9 @@ void render_screen(int fd) {
     vterm_screen_reset(vts, 1);
     vterm_screen_set_callbacks(vts, &callbacks, NULL);
 
-    // char *data = read_file("dosascii");
     char *data = "Test";
     vterm_input_write(vt, data, strlen(data));
-    // free(data);
+
     floatingWindow->vt = vt;
     floatingWindow->vts = vts;
   }
@@ -252,7 +231,11 @@ void render_screen(int fd) {
       Pane *pane = &currentWindow->panes[k];
       draw_pane(pane, currentWindow);
     }
-    draw_borders(currentWindow);
+    if (neotmux->barPos == BAR_BOTTOM) {
+      draw_borders(currentWindow, 0);
+    } else {
+      draw_borders(currentWindow, 1);
+    }
   }
 
   draw_floating_window(floatingWindow, currentWindow);

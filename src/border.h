@@ -3,6 +3,6 @@
 
 #include "session.h"
 
-void draw_borders(Window *window);
+void draw_borders(Window *window, int offset);
 
 #endif

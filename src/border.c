@@ -116,10 +116,10 @@ void write_border_character(int row, int col, Window *window) {
 }
 
 // TODO: Ensure that we color active borders
-void draw_borders(Window *window) {
+void draw_borders(Window *window, int offset) {
   lastColor = 0;
   for (int row = 0; row < window->height; row++) {
-    write_position(row + 1, 1);
+    write_position(row + 1 + offset, 1);
     for (int col = 0; col < window->width; col++) {
       write_border_character(row, col, window);
     }

@@ -111,5 +111,5 @@ char *get_arg_string(int argc, char *argv[], char short_name,
       }
     }
   }
-  return strdup(default_value);
+  return default_value;
 }

@@ -42,10 +42,6 @@ bool load_plugins() {
   char dotfile[PATH_MAX];
   snprintf(dotfile, PATH_MAX, "%s/.ntmux.lua", home);
 
-  if (!load_plugin(neotmux->lua, "lua/default.lua")) {
-    return EXIT_FAILURE;
-  }
-
   {
     fprintf(neotmux->log, "Loading plugins\n");
     char *home = getenv("HOME");
