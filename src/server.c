@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <dirent.h>
@@ -11,6 +13,7 @@
 
 #include "command.h"
 #include "connection.h"
+#include "log.h"
 #include "mouse.h"
 #include "session.h"
 
@@ -32,10 +35,9 @@ ssize_t read_message(int sock, char *buf, size_t len) {
 }
 
 int die_socket_desc = -1;
-#define die(msg)                                                               \
-  fprintf(neotmux->log, "%s\n", msg);                                          \
+#define die()                                                                  \
   close(die_socket_desc);                                                      \
-  fprintf(neotmux->log, "Exiting...\n");                                       \
+  WRITE_LOG(socket, "Exiting...");                                             \
   exit(EXIT_SUCCESS);
 
 void reorder_windows() {
@@ -67,7 +69,6 @@ void delete_window(Window *w) {
 bool handle_input(int socket, char *buf, int read_size);
 
 void reorder_panes(int socket, Window *w) {
-  fprintf(neotmux->log, "Reordering panes\n");
   for (int i = 0; i < w->pane_count; i++) {
     Pane *p = &w->panes[i];
     if (p->process->closed) {
@@ -97,38 +98,30 @@ void reorder_panes(int socket, Window *w) {
 // All possible inputs should have an associated message
 bool handle_input(int socket, char *buf, int read_size) {
   if (read_size == 0) { // Client disconnected
-    fprintf(neotmux->log, "Client disconnected (%d)\n", socket);
-    die("Client disconnected");
+    WRITE_LOG(socket, "Client disconnected");
     return false;
   } else if (read_size == -1) { // Error
-    fprintf(neotmux->log, "Error reading from client (%d)\n", socket);
-    die("Error reading from client");
+    WRITE_LOG(socket, "Error reading from client");
     return false;
   } else if (buf[0] == 's') { // Size
     uint32_t width;
     uint32_t height;
     memcpy(&width, buf + 1, sizeof(uint32_t));
     memcpy(&height, buf + 5, sizeof(uint32_t));
-    fprintf(neotmux->log, "Size (%d): %d, %d\n", socket, width, height);
+    WRITE_LOG(socket, "Size %dx%d", width, height);
     Window *window = get_current_window(neotmux);
     window->width = width;
     window->height = height;
     reorder_panes(socket, window);
     dirty = true;
   } else if (buf[0] == 'e') { // Event
-    if (read_size > 7) {
-      read_size = 7; // TODO: Fix this
-    }
-
-    fprintf(neotmux->log, "Received (%d):", socket);
     for (int i = 1; i < read_size; i++) {
       if (isprint(buf[i])) {
-        fprintf(neotmux->log, " (%d, %c)", buf[i], buf[i]);
+        WRITE_LOG(socket, "Event (%d, %c)", buf[i], buf[i]);
       } else {
-        fprintf(neotmux->log, " (%d)", buf[i]);
+        WRITE_LOG(socket, "Event (%d)", buf[i]);
       }
     }
-    fprintf(neotmux->log, "\n");
 
     if (read_size == 7 && buf[1] == '\033' && buf[2] == '[' && buf[3] == 'M') {
       if (handle_mouse(socket, buf, read_size)) {
@@ -143,7 +136,7 @@ bool handle_input(int socket, char *buf, int read_size) {
     run_command(socket, buf, read_size);
     dirty = true;
   } else {
-    fprintf(neotmux->log, "Unhandled input (%d)\n", socket);
+    WRITE_LOG(socket, "Unhandled input");
   }
 
   return true;
@@ -177,7 +170,7 @@ void *handle_client(void *socket_desc) {
   int socket = *(int *)socket_desc;
   int frame = 0;
 
-  fprintf(neotmux->log, "Client connected (%d)\n", socket);
+  WRITE_LOG(socket, "Client connected");
 
   handle_input(socket, "cInit", 5);
 
@@ -232,12 +225,11 @@ void *handle_client(void *socket_desc) {
           static char buf[1000];
           int read_size = read(p->process->fd, buf, 1000);
           if (read_size == 0) {
-            fprintf(neotmux->log, "Process disconnected (%d)\n",
-                    p->process->fd);
+            WRITE_LOG(socket, "Process disconnected (%d)", p->process->fd);
             exit(EXIT_FAILURE);
           } else if (read_size == -1) {
             p->process->closed = true;
-            fprintf(neotmux->log, "Process closed (%d)\n", p->process->fd);
+            WRITE_LOG(socket, "Process closed (%d)", p->process->fd);
             reorder_panes(socket, w);
             continue;
           }
@@ -260,7 +252,8 @@ void *handle_client(void *socket_desc) {
       Session *session = get_current_session(neotmux);
       if (session->window_count == 0) {
         send(socket, "e", 1, 0);
-        die("No windows");
+        WRITE_LOG(socket, "No windows");
+        die();
       }
 
       run_command(socket, "cRenderScreen", 13);
@@ -324,7 +317,6 @@ void start_server_loop(int socket_desc, char *log_filename) {
 
 int start_server(int sock, char *name, char *log_filename) {
   sockname = name;
-  printf("Sockname: %s\n", name);
 
   start_server_loop(sock, log_filename);
 

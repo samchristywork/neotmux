@@ -1,17 +1,20 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <unistd.h>
 
+#include "log.h"
 #include "render_cell.h"
 #include "session.h"
 
 extern Neotmux *neotmux;
 
-char *call_statusbar_function(int cols, lua_State *lua, char *sessionName,
-                              Window *windows, int windowCount,
-                              Window *currentWindow) {
+char *call_statusbar_function(int socket, int cols, lua_State *lua,
+                              char *sessionName, Window *windows,
+                              int windowCount, Window *currentWindow) {
   lua_getglobal(lua, "statusbar");
   if (!lua_isfunction(lua, -1)) {
-    fprintf(neotmux->log, "statusbar is not a function\n");
+    WRITE_LOG(socket, "statusbar is not a function");
     lua_pop(lua, 1);
     return NULL;
   }
@@ -53,7 +56,7 @@ VTerm *vt = NULL;
 VTermScreen *vts;
 
 // TODO: Ensure line gets cleared
-void write_status_bar(int cols) {
+void write_status_bar(int socket, int cols) {
   if (vt == NULL) {
     vt = vterm_new(1, 1);
     vts = vterm_obtain_screen(vt);
@@ -78,7 +81,7 @@ void write_status_bar(int cols) {
   Window *current_window = get_current_window(neotmux);
 
   char *statusbar = call_statusbar_function(
-      cols, neotmux->lua, session->title, session->windows,
+      socket, cols, neotmux->lua, session->title, session->windows,
       session->window_count, current_window);
 
   if (statusbar) {
@@ -163,15 +166,8 @@ void render_bar(int fd) {
 
   Window *currentWindow = get_current_window(neotmux);
   int cols = currentWindow->width;
-  int rows = currentWindow->height;
 
-  if (neotmux->barPos == BAR_TOP) {
-    write_position(1, 1);
-    write_status_bar(cols);
-  } else if (neotmux->barPos == BAR_BOTTOM) {
-    write_position(rows + 1, 1);
-    write_status_bar(cols);
-  }
+  write_status_bar(fd, cols);
 
   bool show_cursor = write_cursor_position();
   if (show_cursor) {

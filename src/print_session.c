@@ -1,128 +1,132 @@
+#define _GNU_SOURCE
+
 #include <linux/limits.h>
 #include <stdio.h>
 #include <unistd.h>
 
+#include "log.h"
 #include "print_session.h"
 
 extern Neotmux *neotmux;
 
-void print_layout(Layout layout) {
+// TODO: Make this work with WRITE_LOG
+void print_layout(Layout layout, int socket) {
   switch (layout) {
   case LAYOUT_DEFAULT:
-    fprintf(neotmux->log, "Default");
+    WRITE_LOG(socket, "Default");
     break;
   case LAYOUT_EVEN_HORIZONTAL:
-    fprintf(neotmux->log, "Even Horizontal");
+    WRITE_LOG(socket, "Even Horizontal");
     break;
   case LAYOUT_EVEN_VERTICAL:
-    fprintf(neotmux->log, "Even Vertical");
+    WRITE_LOG(socket, "Even Vertical");
     break;
   case LAYOUT_MAIN_HORIZONTAL:
-    fprintf(neotmux->log, "Main Horizontal");
+    WRITE_LOG(socket, "Main Horizontal");
     break;
   case LAYOUT_MAIN_VERTICAL:
-    fprintf(neotmux->log, "Main Vertical");
+    WRITE_LOG(socket, "Main Vertical");
     break;
   case LAYOUT_TILED:
-    fprintf(neotmux->log, "Tiled");
+    WRITE_LOG(socket, "Tiled");
     break;
   default:
-    fprintf(neotmux->log, "Unknown");
+    WRITE_LOG(socket, "Unknown");
     break;
   }
 }
 
-void print_cursor_shape(int cursor_shape) {
+void print_cursor_shape(int cursor_shape, int socket) {
   switch (cursor_shape) {
   case 0:
-    fprintf(neotmux->log, "Default");
+    WRITE_LOG(socket, "Default");
     break;
   case VTERM_PROP_CURSORSHAPE_BLOCK:
-    fprintf(neotmux->log, "Block");
+    WRITE_LOG(socket, "Block");
     break;
   case VTERM_PROP_CURSORSHAPE_UNDERLINE:
-    fprintf(neotmux->log, "Underline");
+    WRITE_LOG(socket, "Underline");
     break;
   case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
-    fprintf(neotmux->log, "Bar Left");
+    WRITE_LOG(socket, "Bar Left");
     break;
   default:
-    fprintf(neotmux->log, "Unknown");
+    WRITE_LOG(socket, "Unknown");
     break;
   }
 
-  fprintf(neotmux->log, "\n");
+  WRITE_LOG(socket, "\n");
 }
 
-void print_process_cwd(pid_t pid) {
+void print_process_cwd(pid_t pid, int socket) {
   char cwd[PATH_MAX] = {0};
   char link[PATH_MAX] = {0};
   sprintf(link, "/proc/%d/cwd", pid);
   if (readlink(link, cwd, sizeof(cwd)) != -1) {
-    fprintf(neotmux->log, "        cwd: %s\n", cwd);
+    WRITE_LOG(socket, "        cwd: %s\n", cwd);
   }
 }
 
-void print_cursor(Cursor *cursor) {
-  fprintf(neotmux->log, "          mouse_active: %s\n",
-          cursor->mouse_active ? "True" : "False");
-  fprintf(neotmux->log, "          shape: ");
-  print_cursor_shape(cursor->shape);
-  fprintf(neotmux->log, "          visible: %s\n",
-          cursor->visible ? "True" : "False");
+void print_cursor(Cursor *cursor, int socket) {
+  WRITE_LOG(socket, "          mouse_active: %s\n",
+            cursor->mouse_active ? "True" : "False");
+  WRITE_LOG(socket, "          shape: ");
+  print_cursor_shape(cursor->shape, socket);
+  WRITE_LOG(socket, "          visible: %s\n",
+            cursor->visible ? "True" : "False");
 }
 
-void print_process(Process *process) {
+void print_process(Process *process, int socket) {
   if (process->pid != -1) {
-    fprintf(neotmux->log, "      Process: %s\n", process->name);
-    fprintf(neotmux->log, "        pid: %d\n", process->pid);
-    fprintf(neotmux->log, "        fd: %d\n", process->fd);
-    fprintf(neotmux->log, "        closed: %s\n",
-            process->closed ? "True" : "False");
-    fprintf(neotmux->log, "        cursor:\n");
-    print_cursor(&process->cursor);
-    print_process_cwd(process->pid);
+    WRITE_LOG(socket, "      Process: %s\n", process->name);
+    WRITE_LOG(socket, "        pid: %d\n", process->pid);
+    WRITE_LOG(socket, "        fd: %d\n", process->fd);
+    WRITE_LOG(socket, "        closed: %s\n",
+              process->closed ? "True" : "False");
+    WRITE_LOG(socket, "        cursor:\n");
+    print_cursor(&process->cursor, socket);
+    print_process_cwd(process->pid, socket);
   } else {
-    fprintf(neotmux->log, "      Process: %s\n", "None");
+    WRITE_LOG(socket, "      Process: %s\n", "None");
   }
 }
 
-void print_pane(Pane *pane) {
-  fprintf(neotmux->log, "    Pane: %p\n", (void *)pane);
-  fprintf(neotmux->log, "      col: %d\n", pane->col);
-  fprintf(neotmux->log, "      row: %d\n", pane->row);
-  fprintf(neotmux->log, "      width: %d\n", pane->width);
-  fprintf(neotmux->log, "      height: %d\n", pane->height);
-  print_process(pane->process);
+void print_pane(Pane *pane, int socket) {
+  WRITE_LOG(socket, "    Pane: %p\n", (void *)pane);
+  WRITE_LOG(socket, "      col: %d\n", pane->col);
+  WRITE_LOG(socket, "      row: %d\n", pane->row);
+  WRITE_LOG(socket, "      width: %d\n", pane->width);
+  WRITE_LOG(socket, "      height: %d\n", pane->height);
+  print_process(pane->process, socket);
 }
 
-void print_window(Window *window) {
-  fprintf(neotmux->log, "  Window: %s\n", window->title);
-  fprintf(neotmux->log, "    Pane Count: %d\n", window->pane_count);
-  fprintf(neotmux->log, "    Current Pane: %d\n", window->current_pane);
-  fprintf(neotmux->log, "    Layout: ");
-  print_layout(window->layout);
-  fprintf(neotmux->log, "\n");
+void print_window(Window *window, int socket) {
+  WRITE_LOG(socket, "  Window: %s\n", window->title);
+  WRITE_LOG(socket, "    Pane Count: %d\n", window->pane_count);
+  WRITE_LOG(socket, "    Current Pane: %d\n", window->current_pane);
+  WRITE_LOG(socket, "    Layout: ");
+  print_layout(window->layout, socket);
+  WRITE_LOG(socket, "\n");
   for (int j = 0; j < window->pane_count; j++) {
     Pane *pane = &window->panes[j];
-    print_pane(pane);
+    print_pane(pane, socket);
   }
 }
 
-void print_session(Session *session) {
-  fprintf(neotmux->log, "Session: %s\n", session->title);
-  fprintf(neotmux->log, "  Window Count: %d\n", session->window_count);
-  fprintf(neotmux->log, "  Current Window: %d\n", session->current_window);
+void print_session(Session *session, int socket) {
+  WRITE_LOG(socket, "Session: %s\n", session->title);
+  WRITE_LOG(socket, "  Window Count: %d\n", session->window_count);
+  WRITE_LOG(socket, "  Current Window: %d\n", session->current_window);
   for (int i = 0; i < session->window_count; i++) {
     Window *window = &session->windows[i];
-    print_window(window);
+    print_window(window, socket);
   }
 }
 
-void print_sessions(Neotmux *neotmux) {
+void print_sessions(Neotmux *neotmux, int socket) {
   int count = neotmux->session_count;
   Session *sessions = neotmux->sessions;
   for (int i = 0; i < count; i++) {
-    print_session(&sessions[i]);
+    print_session(&sessions[i], socket);
   }
 }

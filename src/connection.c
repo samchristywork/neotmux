@@ -1,7 +1,10 @@
+#define _GNU_SOURCE
+
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "log.h"
 #include "session.h"
 
 extern Neotmux *neotmux;
@@ -18,7 +21,7 @@ int accept_connection(int socket_desc, struct sockaddr_in client) {
 
 void wait_for_connection(int socket_desc) {
   listen(socket_desc, 3);
-  fprintf(neotmux->log, "Waiting for incoming connections...");
+  WRITE_LOG(socket_desc, "Waiting for incoming connections");
 }
 
 int *init_connection(int socket_desc) {

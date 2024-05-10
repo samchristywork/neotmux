@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <dirent.h>
 #include <lua5.4/lauxlib.h>
 #include <lua5.4/lua.h>
@@ -7,6 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "log.h"
 #include "session.h"
 
 extern Neotmux *neotmux;
@@ -32,7 +35,7 @@ bool load_plugin(lua_State *L, const char *filename) {
   return true;
 }
 
-bool load_plugins() {
+bool load_plugins(int socket) {
   neotmux->lua = luaL_newstate();
   luaL_openlibs(neotmux->lua);
   char *s = "print('Lua initialized')";
@@ -43,7 +46,7 @@ bool load_plugins() {
   snprintf(dotfile, PATH_MAX, "%s/.ntmux.lua", home);
 
   {
-    fprintf(neotmux->log, "Loading plugins\n");
+    WRITE_LOG(socket, "Loading plugins");
     char *home = getenv("HOME");
     char plugins[PATH_MAX];
     snprintf(plugins, PATH_MAX, "%s/.ntmux/plugins", home);
@@ -53,7 +56,7 @@ bool load_plugins() {
       struct dirent *entry;
       while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_DIR && entry->d_name[0] != '.') {
-          fprintf(neotmux->log, "Loading plugin: %s\n", entry->d_name);
+          WRITE_LOG(socket, "Loading plugin: %s", entry->d_name);
           size_t size = strlen(plugins) + strlen(entry->d_name) + 11;
           if (size > PATH_MAX) {
             fprintf(stderr, "Path too long\n");

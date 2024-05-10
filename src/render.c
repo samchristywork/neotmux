@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <lua5.4/lauxlib.h>
 #include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
@@ -8,6 +10,7 @@
 #include <unistd.h>
 
 #include "border.h"
+#include "log.h"
 #include "render.h"
 #include "render_cell.h"
 #include "session.h"
@@ -201,6 +204,7 @@ void render_screen(int fd) {
     floatingWindow->vts = vts;
   }
 
+void render_screen(int fd) {
   if (neotmux->barPos == BAR_NONE) {
     neotmux->barPos = BAR_BOTTOM;
 
@@ -239,8 +243,11 @@ void render_screen(int fd) {
     }
   }
 
-  draw_floating_window(floatingWindow, currentWindow);
-
+  int x = currentWindow->width;
+  int y = currentWindow->height;
+  int n = neotmux->bb.n;
+  float r = (float)n / (x * y);
+  WRITE_LOG(fd, "Render (%dx%d). Writing %d bytes (%f bytes/cell)", x, y, n, r);
   write(fd, neotmux->bb.buffer, neotmux->bb.n);
 }
 

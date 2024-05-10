@@ -3,6 +3,6 @@
 
 #include "session.h"
 
-void print_sessions(Neotmux *neotmux);
+void print_sessions(Neotmux *neotmux, int socket);
 
 #endif

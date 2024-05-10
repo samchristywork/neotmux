@@ -135,7 +135,6 @@ int main(int argc, char *argv[]) {
     int sock = init_client(name);
     return start_client(sock);
   } else if (!client_mode && server_mode) {
-    // TODO: Remember to remove the socket file
     int sock = init_server(name);
     return start_server(sock, name, log_filename);
   } else if (!client_mode && !server_mode) {

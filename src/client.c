@@ -218,10 +218,6 @@ void handle_events(int sock) {
 
     if (mode == MODE_NORMAL) {
       if (handle_lua_binding(n, buf, sock, MODE_NORMAL)) {
-      } else if (n == 2 && buf[1] == 27 && buf[2] == ',') {
-        write_message(sock, "cPrev", 5);
-      } else if (n == 2 && buf[1] == 27 && buf[2] == '.') {
-        write_message(sock, "cNext", 5);
       } else if (n == 1 && buf[1] == 1) { // Ctrl-A
         mode = MODE_CONTROL;
       } else if (n == 1 && buf[1] == 10) { // Enter
@@ -231,8 +227,7 @@ void handle_events(int sock) {
         write_message(sock, buf, n + 1);
       }
     } else if (mode == MODE_CONTROL || mode == MODE_CONTROL_STICKY) {
-      // TODO: Detect and ignore mouse events
-      // TODO: Change to lua
+      // TODO: Detect and ignore mouse events in control mode
       handle_binding(n, buf, sock, "cScrollUp", "\033[5~");   // Page up
       handle_binding(n, buf, sock, "cScrollDown", "\033[6~"); // Page down
 

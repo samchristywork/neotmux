@@ -1,9 +1,12 @@
+#define _GNU_SOURCE
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "layout.h"
+#include "log.h"
 #include "move.h"
 #include "pane.h"
 #include "plugin.h"
@@ -81,10 +84,10 @@ void handle_command(int socket, char *buf, int read_size) {
   memcpy(cmd, buf + 1, read_size - 1);
   cmd[read_size - 1] = '\0';
 
-  fprintf(neotmux->log, "Command (%d): %s\n", socket, cmd);
+  WRITE_LOG(socket, "%s", cmd);
 
   if (strcmp(cmd, "Init") == 0) {
-    load_plugins();
+    load_plugins(socket);
 
     Session *s = add_session(neotmux, "Main");
     Window *w = add_window(s, "Main");
@@ -158,7 +161,7 @@ void handle_command(int socket, char *buf, int read_size) {
   } else if (strcmp(cmd, "CycleStatus") == 0) {
     neotmux->statusBarIdx++;
   } else if (strcmp(cmd, "List") == 0) {
-    print_sessions(neotmux);
+    print_sessions(neotmux, socket);
   } else if (strcmp(cmd, "Next") == 0) {
     Session *session = get_current_session(neotmux);
     session->current_window++;
@@ -281,8 +284,8 @@ void handle_command(int socket, char *buf, int read_size) {
     char *title = strdup(cmd + 14);
     session->title = title;
   } else if (strcmp(cmd, "ReloadLua") == 0) {
-    load_plugins();
+    load_plugins(socket);
   } else {
-    fprintf(neotmux->log, "Unhandled command (%d): %s\n", socket, cmd);
+    WRITE_LOG(socket, "Unhandled command: %s\n", cmd);
   }
 }

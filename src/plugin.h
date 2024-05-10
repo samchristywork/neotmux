@@ -3,6 +3,6 @@
 
 #include <lua5.4/lua.h>
 
-bool load_plugins();
+bool load_plugins(int socket);
 
 #endif
