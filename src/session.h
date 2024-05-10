@@ -64,6 +64,7 @@ typedef struct Window {
   int height;
   Layout layout;
   int zoom;
+  bool rerender;
 } Window;
 
 typedef struct Session {

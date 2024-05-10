@@ -99,7 +99,12 @@ void write_status_bar(int socket, int cols) {
       pos.col = i;
       pos.row = 0;
       vterm_screen_get_cell(vts, pos, &cell);
-      render_cell(cell);
+
+      if (neotmux->barPos == BAR_TOP) {
+        render_cell(&cell, 1, i + 1);
+      } else if (neotmux->barPos == BAR_BOTTOM) {
+        render_cell(&cell, current_window->height + 1, i + 1);
+      }
     }
   }
 }
