@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -51,6 +52,7 @@ Window *add_window(Session *session, char *title) {
   window->width = 80;
   window->height = 24;
   window->zoom = -1;
+  window->rerender = false;
   session->window_count++;
   return window;
 }
@@ -131,11 +133,38 @@ void handle_command(int socket, char *buf, int read_size) {
     Window *currentWindow = get_current_window(neotmux);
     calculate_layout(currentWindow);
   } else if (strcmp(cmd, "RenderScreen") == 0) {
-    clock_t start = clock();
+    // TODO: Implement double buffering
+    // TODO: Why do we send 900+ bytes for a single char update?
+    struct timeval start;
+    struct timeval end;
+    gettimeofday(&start, NULL);
     render(socket, RENDER_SCREEN);
-    clock_t end = clock();
-    float renderTime = (float)(end - start) / CLOCKS_PER_SEC * 1000;
-    fprintf(neotmux->log, "Render took %f ms\n", renderTime);
+    gettimeofday(&end, NULL);
+
+    static struct timeval programStart;
+    struct timeval currentTime;
+    gettimeofday(&currentTime, NULL);
+    static int renderCount = 0;
+    if (renderCount > 300) {
+      renderCount = 0;
+    }
+    if (renderCount == 0) {
+      gettimeofday(&programStart, NULL);
+    }
+    renderCount++;
+
+    float elapsedTime = 0;
+    elapsedTime += currentTime.tv_sec - programStart.tv_sec;
+    elapsedTime += (currentTime.tv_usec - programStart.tv_usec) / 1000000.0;
+
+    float renderTime = 0;
+    renderTime = (end.tv_sec - start.tv_sec) * 1000.0;
+    renderTime += (end.tv_usec - start.tv_usec) / 1000.0;
+
+    WRITE_LOG(socket, "Render took %f ms", renderTime);
+    WRITE_LOG(socket, "Renders: %d", renderCount);
+    WRITE_LOG(socket, "Seconds: %f", elapsedTime);
+    WRITE_LOG(socket, "Renders/Sec: %f", (float)renderCount / elapsedTime);
   } else if (strcmp(cmd, "RenderBar") == 0) {
     render(socket, RENDER_BAR);
   } else if (strcmp(cmd, "Layout") == 0) {
