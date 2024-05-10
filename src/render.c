@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <fcntl.h>
 #include <lua5.4/lauxlib.h>
 #include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
@@ -48,21 +49,76 @@ void clear_style() {
   buf_write("\033[0m", 4); // Reset style
 }
 
-void draw_row(int paneRow, int windowRow, Pane *pane) {
+bool compare_cells(VTermScreenCell *a, VTermScreenCell *b) {
+  int ret = memcmp(a, b, sizeof(VTermScreenCell));
+  return ret != 0;
+}
+
+void draw_history_row(int paneRow, int windowRow, Pane *pane);
+
+void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
   if (neotmux->barPos == BAR_TOP) {
     windowRow += 1;
   }
-  write_position(windowRow + 1, pane->col + 1);
 
+  static VTermScreenCell *prevCells = NULL;
+  if (prevCells == NULL) {
+    prevCells = malloc(sizeof(VTermScreenCell));
+  }
+
+  // TODO: Simplify all of this down to just currentWindow->rerender
+  {
+    static int width = 0;
+    static int height = 0;
+    static Window *window = NULL;
+    static int pane_count = 0;
+    static Layout layout = 0;
+    if (width != currentWindow->width || height != currentWindow->height ||
+        window != currentWindow || currentWindow->pane_count != pane_count ||
+        currentWindow->layout != layout || currentWindow->rerender) {
+      int n = currentWindow->width * currentWindow->height;
+      prevCells = realloc(prevCells, n * sizeof(VTermScreenCell));
+      bzero(prevCells, n * sizeof(VTermScreenCell));
+      width = currentWindow->width;           // Needed when resizing window
+      height = currentWindow->height;         // Needed when resizing window
+      window = currentWindow;                 // Needed when deleting a window
+      pane_count = currentWindow->pane_count; // Needed when deleting a pane
+      layout = currentWindow->layout;         // Needed when changing layout
+      currentWindow->rerender = false;
+    }
+  }
+
+  int paneRow = row + pane->process->scrolloffset;
   for (int col = pane->col; col < pane->col + pane->width; col++) {
     VTermPos pos;
     pos.row = paneRow;
     pos.col = col - pane->col;
     VTermScreen *vts = pane->process->vts;
 
-    VTermScreenCell cell = {0};
-    vterm_screen_get_cell(vts, pos, &cell);
-    draw_cell(cell);
+    if (paneRow >= pane->height) {
+      VTermScreenCell cell = {0};
+      cell.chars[0] = 'x';
+      cell.bg.type = VTERM_COLOR_DEFAULT_BG;
+      cell.bg.indexed.idx = 0;
+      cell.fg.type = VTERM_COLOR_INDEXED;
+      cell.fg.indexed.idx = 7;
+      cell.width = 1;
+
+      draw_cell(&cell, windowRow + 1, col + 1);
+    } else if (paneRow >= 0) {
+      VTermScreenCell cell = {0};
+      vterm_screen_get_cell(vts, pos, &cell);
+
+      int idx = col + windowRow * currentWindow->width;
+      if (compare_cells(&cell, &prevCells[idx])) {
+        prevCells[idx] = cell;
+        draw_cell(&cell, windowRow + 1, col + 1);
+      }
+    } else {
+      write_position(windowRow + 1, col + 1);
+      buf_write(" ", 1);
+      // draw_history_row(-paneRow, windowRow, pane);
+    }
   }
   clear_style();
 }
@@ -138,72 +194,16 @@ void draw_pane(Pane *pane, Window *window) {
       continue;
     }
 
-    int scroll = pane->process->scrolloffset;
-    int paneRow = row + scroll;
-    if (paneRow >= 0) {
-      draw_row(paneRow, windowRow, pane);
-    } else {
-      draw_history_row(-paneRow, windowRow, pane);
-    }
+    draw_row(row, windowRow, pane, window);
   }
   // draw_bar(pane, window);
 }
 
-void draw_floating_window(FloatingWindow *floatingWindow, Window *window) {
-  if (floatingWindow->visible) {
-    clear_style();
-    for (int row = 0; row < floatingWindow->height; row++) {
-      write_position(row + 1, 1);
-      for (int col = 0; col < floatingWindow->width; col++) {
-        if (is_in_rect(row, col, 0, 0, floatingWindow->height,
-                       floatingWindow->width)) {
-          VTermScreenCell cell = {0};
-          VTermPos pos;
-          pos.row = row;
-          pos.col = col;
-          VTermScreen *vts = floatingWindow->vts;
-          vterm_screen_get_cell(vts, pos, &cell);
-          cell.bg.type = VTERM_COLOR_INDEXED;
-          cell.bg.indexed.idx = 8;
-          draw_cell(cell);
-        }
-      }
-    }
-  }
+void make_nonblocking(int fd) {
+  int flags = fcntl(fd, F_GETFL, 0);
+  fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
-void render_screen(int fd) {
-  if (!floatingWindow) {
-    floatingWindow = malloc(sizeof(FloatingWindow));
-    floatingWindow->height = 43;
-    floatingWindow->width = 80;
-    floatingWindow->visible = false;
-
-    VTerm *vt;
-    VTermScreen *vts;
-    vt = vterm_new(floatingWindow->height, floatingWindow->width);
-    vts = vterm_obtain_screen(vt);
-
-    static VTermScreenCallbacks callbacks;
-    callbacks.damage = NULL;
-    callbacks.moverect = NULL;
-    callbacks.movecursor = NULL;
-    callbacks.settermprop = NULL;
-    callbacks.bell = NULL;
-    callbacks.resize = NULL;
-    callbacks.sb_pushline = NULL;
-    callbacks.sb_popline = NULL;
-
-    vterm_set_utf8(vt, 1);
-    vterm_screen_reset(vts, 1);
-    vterm_screen_set_callbacks(vts, &callbacks, NULL);
-
-    char *data = "Test";
-    vterm_input_write(vt, data, strlen(data));
-
-    floatingWindow->vt = vt;
-    floatingWindow->vts = vts;
-  }
 
 void render_screen(int fd) {
   if (neotmux->barPos == BAR_NONE) {
