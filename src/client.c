@@ -60,13 +60,12 @@ bool receive_message(int sock) {
   FD_ZERO(&fds);
   FD_SET(sock, &fds);
 
-  char server_reply[2000];
+#define len 2000 // TODO: Tune this value
+  static char server_reply[len];
   int retval = select(sock + 1, &fds, NULL, NULL, NULL);
   if (retval == -1) {
-    perror("select()");
-    return false;
   } else if (retval) {
-    int read_size = recv(sock, server_reply, 2000, 0);
+    int read_size = recv(sock, server_reply, len, 0);
     if (read_size == 0) {
       puts("Server disconnected");
       return false;
@@ -78,7 +77,7 @@ bool receive_message(int sock) {
     }
     if (rawMode) {
       write(STDOUT_FILENO, server_reply, read_size);
-      fflush(stdout);
+      // fflush(stdout);
     }
   } else {
     puts("Timeout (This should not happen)");
@@ -102,7 +101,7 @@ void send_size(int sock) {
   write_message(sock, buf, 9);
 }
 
-void handle_binding(int numRead, char *buf, int sock, char *command,
+void handle_binding(size_t numRead, char *buf, int sock, char *command,
                     char *binding) {
   if (numRead == strlen(binding) &&
       strncmp(buf + 1, binding, strlen(binding)) == 0) {
@@ -111,7 +110,10 @@ void handle_binding(int numRead, char *buf, int sock, char *command,
 }
 
 char *readline_text;
-void add_readline_history() { rl_insert_text(readline_text); }
+int add_readline_history() {
+  rl_insert_text(readline_text);
+  return 0;
+}
 
 void handle_rename(int sock, char *prompt, char *default_name, char *command) {
   reset_mode();
@@ -204,7 +206,6 @@ void *handle_events(void *socket_desc) {
   while (1) {
     ssize_t n = read(STDIN_FILENO, buf + 1, 6);
     if (n <= 0) {
-      exit(EXIT_SUCCESS);
     }
 
     if (mode == MODE_NORMAL) {
@@ -261,6 +262,7 @@ void *handle_events(void *socket_desc) {
   }
 
   reset_mode();
+  return 0;
 }
 
 int resize_socket;
@@ -280,7 +282,8 @@ void *receive_messages(void *socket_desc) {
     }
   }
   close(sock);
-  exit(EXIT_SUCCESS);
+
+  return 0;
 }
 
 void handle_sigint(int sig) {
@@ -294,9 +297,9 @@ void start_client(int sock) {
   write(STDOUT_FILENO, "\033[?1049h", 8); // Alternate screen
 
   pthread_t thread;
-  pthread_create(&thread, NULL, receive_messages, (void *)&sock);
+  pthread_create(&thread, NULL, handle_events, (void *)&sock);
 
-  handle_events(sock);
+  receive_messages((void *)&sock);
 
   pthread_cancel(thread);
   pthread_join(thread, NULL);
