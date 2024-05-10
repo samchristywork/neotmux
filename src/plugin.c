@@ -41,10 +41,6 @@ bool load_plugins(int socket) {
   char *s = "print('Lua initialized')";
   luaL_dostring(neotmux->lua, s);
 
-  char *home = getenv("HOME");
-  char dotfile[PATH_MAX];
-  snprintf(dotfile, PATH_MAX, "%s/.ntmux.lua", home);
-
   {
     WRITE_LOG(socket, "Loading plugins");
     char *home = getenv("HOME");
@@ -72,11 +68,11 @@ bool load_plugins(int socket) {
     }
   }
 
-  if (!load_plugin(neotmux->lua, dotfile)) {
-    return EXIT_FAILURE;
-  }
+  char *home = getenv("HOME");
+  char dotfile[PATH_MAX];
+  snprintf(dotfile, PATH_MAX, "%s/.ntmux.lua", home);
 
-  if (!load_plugin(neotmux->lua, "lua/init.lua")) {
+  if (!load_plugin(neotmux->lua, dotfile)) {
     return EXIT_FAILURE;
   }
 
