@@ -7,6 +7,7 @@
 #include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
 #include <pthread.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -315,7 +316,11 @@ void start_server_loop(int socket_desc, char *log_filename) {
   }
 }
 
+void handle_ctrl_c() { signal(SIGINT, handle_ctrl_c); }
+
 int start_server(int sock, char *name, char *log_filename) {
+  signal(SIGINT, handle_ctrl_c);
+
   sockname = name;
 
   start_server_loop(sock, log_filename);

@@ -6,13 +6,13 @@
 #include "args.h"
 
 Arg args[52];
-int max_long_name_len = 0;
+int max_name_len = 0;
 
 void add_arg(char short_name, const char *long_name, const char *description,
              FLAG flags) {
   int len = strlen(long_name);
-  if (len > max_long_name_len) {
-    max_long_name_len = len;
+  if (len > max_name_len) {
+    max_name_len = len;
   }
   if (short_name >= 'a' && short_name <= 'z') {
     args[short_name - 'a'] = (Arg){long_name, description, flags};
@@ -34,7 +34,7 @@ void usage(const char *program_name) {
       fprintf(stderr, "-%c", i < 26 ? 'a' + i : 'A' + i - 26);
       fprintf(stderr, ", ");
       fprintf(stderr, "--%s:", args[i].long_name);
-      for (int j = 0; j < max_long_name_len - strlen(args[i].long_name); j++) {
+      for (size_t j = 0; j < max_name_len - strlen(args[i].long_name); j++) {
         fprintf(stderr, " ");
       }
       fprintf(stderr, "  %s\n", args[i].description);

@@ -29,16 +29,6 @@ ssize_t write_message(int sock, char *buf, size_t len) {
   return write(sock, buf, len);
 }
 
-int ctrl_c_socket;
-void handle_sigint(int sig) {
-  char buf[2];
-  buf[0] = 'e';
-  buf[1] = 3;
-  write_message(ctrl_c_socket, buf, 2);
-
-  signal(sig, handle_sigint);
-}
-
 void enable_mouse_tracking() {
   write(STDOUT_FILENO, "\033[?1003h", 8); // Mouse tracking
   // write(STDOUT_FILENO, "\033[?1006h", 8); // Extended mouse tracking
@@ -203,7 +193,8 @@ bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
   return false;
 }
 
-void handle_events(int sock) {
+void *handle_events(void *socket_desc) {
+  int sock = *(int *)socket_desc;
   rl_startup_hook = (rl_hook_func_t *)add_readline_history;
   enter_raw_mode();
 
@@ -273,7 +264,7 @@ void handle_events(int sock) {
 }
 
 int resize_socket;
-void handle_resize(int sig) { send_size(resize_socket); }
+void handle_resize() { send_size(resize_socket); }
 
 void *receive_messages(void *socket_desc) {
   int sock = *(int *)socket_desc;
@@ -292,9 +283,13 @@ void *receive_messages(void *socket_desc) {
   exit(EXIT_SUCCESS);
 }
 
+void handle_sigint(int sig) {
+  write_message(resize_socket, "e\x03", 2);
+  signal(sig, handle_sigint);
+}
+
 void start_client(int sock) {
   signal(SIGINT, handle_sigint);
-  ctrl_c_socket = sock;
 
   write(STDOUT_FILENO, "\033[?1049h", 8); // Alternate screen
 

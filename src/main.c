@@ -1,5 +1,4 @@
 #include <arpa/inet.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,11 +20,6 @@
   "\n"                                                                         \
   "This is free software; you are free to change and redistribute it.\n"       \
   "There is NO WARRANTY, to the extent permitted by law."
-
-void handle_ctrl_c(int sig) {
-  signal(SIGINT, handle_ctrl_c);
-  // die("Ctrl-C");
-}
 
 int init_client(char *name) {
   mkdir("/tmp/ntmux-1000", 0777);
@@ -97,7 +91,7 @@ int main(int argc, char *argv[]) {
   bool use_unix = get_arg_bool(argc, argv, 'u', true);
   char *name = get_arg_string(argc, argv, 'n', "local");
   char *log_filename = get_arg_string(argc, argv, 'l', "ntmux.log");
-  int port = get_arg_int(argc, argv, 'p', 5097);
+  //int port = get_arg_int(argc, argv, 'p', 5097);
 
   if (version) {
     printf("%s\n\n%s\n", VERSION_STRING, LICENSE_STRING);
@@ -142,7 +136,6 @@ int main(int argc, char *argv[]) {
     if (pid == 0) {
       // Child process
       int sock = init_server(name);
-      signal(SIGINT, handle_ctrl_c);
       close(0);
       close(1);
       close(2);
