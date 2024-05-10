@@ -73,20 +73,6 @@ bool compare_colors(VTermColor a, VTermColor b) {
   }
 }
 
-// int has_lua_function(lua_State *L, const char *function) {
-//   fprintf(neotmux->log, "Checking if function exists: %s\n", function);
-//   lua_getglobal(L, function);
-//   if (lua_isfunction(L, -1)) {
-//     fprintf(neotmux->log, "Function exists\n");
-//     lua_pop(L, 1);
-//     return 1;
-//   } else {
-//     fprintf(neotmux->log, "Function does not exist\n");
-//     lua_pop(L, 1);
-//     return 0;
-//   }
-// }
-
 void write_rgb_color(int red, int green, int blue, int type) {
   char buf[32];
   int n = snprintf(buf, 32, "\033[%d;2;%d;%d;%dm", type, red, green, blue);
@@ -96,28 +82,6 @@ void write_rgb_color(int red, int green, int blue, int type) {
 // TODO: Interpolate into rgb colors
 // TODO: Change from a function to static data
 void write_indexed_color(int idx, int type) {
-  // static int has_interpolation_function = -1;
-  // if (has_interpolation_function == -1) {
-  //   has_interpolation_function =
-  //       has_lua_function(neotmux->lua, "interpolate_color");
-  // } else if (has_interpolation_function) {
-  //   lua_getglobal(neotmux->lua, "interpolate_color");
-  //   lua_pushinteger(neotmux->lua, idx);
-  //   lua_call(neotmux->lua, 1, 4);
-
-  //  bool use = lua_toboolean(neotmux->lua, -4);
-  //  int red = lua_tointeger(neotmux->lua, -3);
-  //  int green = lua_tointeger(neotmux->lua, -2);
-  //  int blue = lua_tointeger(neotmux->lua, -1);
-
-  //  lua_pop(neotmux->lua, 4);
-
-  //  if (use) {
-  //    write_rgb_color(red, green, blue, type);
-  //    return;
-  //  }
-  //}
-
   char buf[32];
   int n = snprintf(buf, 32, "\033[%d;5;%dm", type, idx);
   buf_write(buf, n);

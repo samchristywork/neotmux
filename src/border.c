@@ -65,9 +65,10 @@ bool borders_active_pane(int row, int col, Window *window) {
 }
 
 int lastColor;
-void write_border_character(int row, int col, Window *window) {
+int lastCol = 0;
+int lastRow = 0;
+void write_border_character(int row, int col, Window *window, int offset) {
   if (is_in_pane(row, col, window)) {
-    buf_write("\033[1C", 4);
     return;
   }
 
@@ -76,15 +77,29 @@ void write_border_character(int row, int col, Window *window) {
   bool d = is_border(row + 1, col, window);
   bool u = is_border(row - 1, col, window);
 
-  if (u || d || l || r) {
-    if (borders_active_pane(row, col, window)) {
-      if (lastColor != 2) {
-        buf_color(2);
-      }
-    } else {
-      if (lastColor != 8) {
-        buf_color(8);
-      }
+  if (!u && !d && !l && !r) {
+    return;
+  }
+
+  // Note: Performance improvement is marginal above just always writing the
+  // position.
+  int currentCol = col + 1;
+  int currentRow = row + 1 + offset;
+  if (lastCol != currentCol - 1 || lastRow != currentRow) {
+    write_position(currentRow, currentCol);
+    lastCol = currentCol;
+    lastRow = currentRow;
+  }
+
+  if (borders_active_pane(row, col, window)) {
+    if (lastColor != 2) {
+      buf_color(2);
+      lastColor = 2;
+    }
+  } else {
+    if (lastColor != 8) {
+      buf_color(8);
+      lastColor = 8;
     }
   }
 
@@ -110,8 +125,6 @@ void write_border_character(int row, int col, Window *window) {
     buf_write("┌", 3);
   } else if (!u && !d && l && r) {
     buf_write("─", 3);
-  } else {
-    buf_write(" ", 1);
   }
 }
 
@@ -119,9 +132,8 @@ void write_border_character(int row, int col, Window *window) {
 void draw_borders(Window *window, int offset) {
   lastColor = 0;
   for (int row = 0; row < window->height; row++) {
-    write_position(row + 1 + offset, 1);
     for (int col = 0; col < window->width; col++) {
-      write_border_character(row, col, window);
+      write_border_character(row, col, window, offset);
     }
   }
 }
