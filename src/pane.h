@@ -3,6 +3,6 @@
 
 #include "session.h"
 
-void add_process_to_pane(Pane *pane);
+void add_process_to_pane(Pane *pane, char *cmd);
 
 #endif

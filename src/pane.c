@@ -95,7 +95,7 @@ void initialize_vterm_instance(VTerm **vt, VTermScreen **vts, int h, int w,
   vterm_screen_set_callbacks(*vts, &callbacks, pane->process);
 }
 
-void add_process_to_pane(Pane *pane) {
+void add_process_to_pane(Pane *pane, char *cmd) {
   bool keepDir = get_lua_boolean(neotmux->lua, "keep_dir", false);
   struct winsize ws = {0};
   ws.ws_col = pane->width;
@@ -120,6 +120,10 @@ void add_process_to_pane(Pane *pane) {
     char *shell = get_lua_string(neotmux->lua, "shell", NULL);
     if (!shell) {
       shell = getenv("SHELL");
+    }
+
+    if (cmd != NULL) {
+      shell = cmd;
     }
 
     execlp(shell, shell, (char *)NULL);

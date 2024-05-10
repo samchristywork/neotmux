@@ -32,6 +32,11 @@ ssize_t read_message(int sock, char *buf, size_t len) {
   if (read(sock, &size, sizeof(uint32_t)) != sizeof(uint32_t)) {
     return -1;
   }
+
+  if (size > len) {
+    return -1;
+  }
+
   return read(sock, buf, size);
 }
 

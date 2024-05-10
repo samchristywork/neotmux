@@ -39,7 +39,9 @@ FloatingWindow *floatingWindow = NULL;
   int n = snprintf(buf, 32, "\033[%d;%dH", row, col);                          \
   buf_write(buf, n);
 
-void draw_cell(VTermScreenCell cell) { render_cell(cell); }
+void draw_cell(VTermScreenCell *cell, int row, int col) {
+  render_cell(cell, row, col);
+}
 
 void clear_style() {
   bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));
@@ -68,7 +70,7 @@ void draw_row(int paneRow, int windowRow, Pane *pane) {
 VTermScreenCell *get_history_cell(ScrollBackLines scrollback, int row,
                                   int col) {
   row = scrollback.size - row;
-  if (row < 0 || row >= scrollback.size) {
+  if ((size_t)row < 0 || (size_t)row >= scrollback.size) {
     return NULL;
   }
 
@@ -83,12 +85,11 @@ VTermScreenCell *get_history_cell(ScrollBackLines scrollback, int row,
 // TODO: Add scrollback module
 void draw_history_row(int paneRow, int windowRow, Pane *pane) {
   write_position(windowRow + 1, pane->col + 1);
-
   for (int col = pane->col; col < pane->col + pane->width; col++) {
     ScrollBackLines sb = pane->process->scrollback;
     VTermScreenCell *cell = get_history_cell(sb, paneRow, col - pane->col);
     if (cell) {
-      draw_cell(*cell);
+      draw_cell(cell, windowRow + 1, pane->col + 1);
     } else {
       buf_write(" ", 1);
     }
@@ -236,6 +237,7 @@ void render_screen(int fd) {
       Pane *pane = &currentWindow->panes[k];
       draw_pane(pane, currentWindow);
     }
+    // TODO: Don't draw borders if not necessary
     if (neotmux->barPos == BAR_BOTTOM) {
       draw_borders(currentWindow, 0);
     } else {
@@ -252,6 +254,7 @@ void render_screen(int fd) {
 }
 
 void render(int fd, RenderType type) {
+  // TODO: Combine into one
   if (type == RENDER_SCREEN) {
     render_screen(fd);
   } else if (type == RENDER_BAR) {

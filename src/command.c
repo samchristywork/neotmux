@@ -16,7 +16,7 @@
 
 extern Neotmux *neotmux;
 
-Pane *add_pane(Window *window) {
+Pane *add_pane(Window *window, char *cmd) {
   int n = sizeof(*window->panes) * (window->pane_count + 1);
   window->panes = realloc(window->panes, n);
   Pane *pane = &window->panes[window->pane_count];
@@ -34,7 +34,7 @@ Pane *add_pane(Window *window) {
   pane->process->cursor.shape = VTERM_PROP_CURSORSHAPE_BLOCK;
   window->pane_count++;
 
-  add_process_to_pane(pane);
+  add_process_to_pane(pane, cmd);
   return pane;
 }
 
@@ -100,7 +100,7 @@ void handle_command(int socket, char *buf, int read_size) {
     lua_pop(neotmux->lua, 1);
 
     for (int i = 0; i < initial_panes; i++) {
-      add_pane(w);
+      add_pane(w, NULL);
     }
     return;
   }
@@ -125,7 +125,7 @@ void handle_command(int socket, char *buf, int read_size) {
     Window *w = get_current_window(neotmux);
     window->width = w->width;
     window->height = w->height;
-    add_pane(window);
+    add_pane(window, NULL);
     session->current_window = session->window_count - 1;
 
     Window *currentWindow = get_current_window(neotmux);
@@ -148,13 +148,13 @@ void handle_command(int socket, char *buf, int read_size) {
     //}
   } else if (strcmp(cmd, "VSplit") == 0) {
     Window *w = get_current_window(neotmux);
-    add_pane(w);
+    add_pane(w, NULL);
     calculate_layout(w);
     w->current_pane = w->pane_count - 1;
     w->zoom = -1;
   } else if (strcmp(cmd, "Split") == 0) {
     Window *w = get_current_window(neotmux);
-    add_pane(w);
+    add_pane(w, NULL);
     calculate_layout(w);
     w->current_pane = w->pane_count - 1;
     w->zoom = -1;
@@ -268,7 +268,7 @@ void handle_command(int socket, char *buf, int read_size) {
     Window *w = get_current_window(neotmux);
     window->width = w->width;
     window->height = w->height;
-    add_pane(window);
+    add_pane(window, NULL);
     session->current_window = session->window_count - 1;
 
     Window *currentWindow = get_current_window(neotmux);
