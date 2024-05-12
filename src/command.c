@@ -314,6 +314,9 @@ void handle_command(int socket, char *buf, int read_size) {
     session->title = title;
   } else if (strcmp(cmd, "ReloadLua") == 0) {
     load_plugins(socket);
+  } else if (strcmp(cmd, "Quit") == 0) {
+    close(socket);
+    exit(0);
   } else {
     WRITE_LOG(socket, "Unhandled command: %s\n", cmd);
   }
