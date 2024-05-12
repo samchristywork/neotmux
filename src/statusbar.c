@@ -166,18 +166,10 @@ void write_cursor_style() {
 }
 
 void render_bar(int fd) {
-  neotmux->bb.n = 0;
   buf_write("\033[?25l", 6); // Hide cursor
 
   Window *currentWindow = get_current_window(neotmux);
   int cols = currentWindow->width;
 
   write_status_bar(fd, cols);
-
-  bool show_cursor = write_cursor_position();
-  if (show_cursor) {
-    write_cursor_style();
-  }
-
-  write(fd, neotmux->bb.buffer, neotmux->bb.n);
 }

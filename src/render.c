@@ -213,7 +213,7 @@ void make_nonblocking(int fd) {
 }
 
 
-void render_screen(int fd) {
+void render_screen() {
   if (neotmux->barPos == BAR_NONE) {
     neotmux->barPos = BAR_BOTTOM;
 
@@ -233,7 +233,6 @@ void render_screen(int fd) {
     neotmux->bb.capacity = 100;
   }
 
-  neotmux->bb.n = 0;
   buf_write("\033[?25l", 6); // Hide cursor
 
   Window *currentWindow = get_current_window(neotmux);
@@ -266,8 +265,16 @@ void render_screen(int fd) {
 
 void render(int fd, RenderType type) {
   if (type == RENDER_SCREEN) {
-    render_screen(fd);
+    render_screen();
   } else if (type == RENDER_BAR) {
     render_bar(fd);
   }
+
+  bool show_cursor = write_cursor_position();
+  if (show_cursor) {
+    write_cursor_style();
+  }
+
+  write(fd, neotmux->bb.buffer, neotmux->bb.n);
+  neotmux->bb.n = 0;
 }
