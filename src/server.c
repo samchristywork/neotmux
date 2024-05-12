@@ -263,9 +263,9 @@ void *handle_client(void *socket_desc) {
       }
 
       run_command(socket, "cRenderScreen", 13);
-      run_command(socket, "cRenderBar", 10);
       dirty = false;
     }
+
     if (frame % 60 == 0) {
       run_command(socket, "cRenderBar", 10);
     }

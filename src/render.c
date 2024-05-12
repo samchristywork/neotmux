@@ -254,18 +254,19 @@ void render_screen() {
       }
     }
   }
-
-  int x = currentWindow->width;
-  int y = currentWindow->height;
-  int n = neotmux->bb.n;
-  float r = (float)n / (x * y);
-  WRITE_LOG(fd, "Render (%dx%d). Writing %d bytes (%f bytes/cell)", x, y, n, r);
-  write(fd, neotmux->bb.buffer, neotmux->bb.n);
 }
 
 void render(int fd, RenderType type) {
   if (type == RENDER_SCREEN) {
+    int before = neotmux->bb.n;
     render_screen();
+    Window *currentWindow = get_current_window(neotmux);
+    int x = currentWindow->width;
+    int y = currentWindow->height;
+    int n = neotmux->bb.n - before;
+    float r = (float)n / (x * y);
+    WRITE_LOG(fd, "Render (%dx%d). Writing %d bytes (%f bytes/cell)", x, y, n,
+              r);
   } else if (type == RENDER_BAR) {
     render_bar(fd);
   }
