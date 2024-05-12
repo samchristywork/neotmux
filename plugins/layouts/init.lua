@@ -83,3 +83,36 @@ function layout_custom(idx, count, width, height)
   local col = 8 * idx
   return col, row, 40, 10
 end
+
+function layout_tiled(idx, count, width, height)
+  local sqrt = math.ceil(math.sqrt(count))
+  local cols = sqrt
+  local rows = math.ceil(count / cols)
+
+  local col = idx % cols
+  local row = math.floor(idx / cols)
+
+  local x = math.floor(col * width / cols)
+  local y = math.floor(row * height / rows)
+
+  local x2 = math.floor((col + 1) * width / cols)
+  local y2 = math.floor((row + 1) * height / rows)
+
+  local w = x2 - x - 1
+  local h = y2 - y - 1
+
+  if (col == cols - 1) then
+    w = width - x
+  end
+
+  if (row == rows - 1) then
+    h = height - y
+  end
+
+  if (idx == count - 1) then
+    w = width - x
+    h = height - y
+  end
+
+  return x, y, w, h
+end

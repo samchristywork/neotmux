@@ -92,7 +92,7 @@ void calculate_layout(Window *window) {
       apply_custom_layout(window, "layout_main_vertical");
       break;
     case LAYOUT_TILED:
-      // apply_tiled_layout(window);
+      apply_custom_layout(window, "layout_tiled");
       break;
     case LAYOUT_CUSTOM:
       // TODO: Fix how borders work to make this look correct
