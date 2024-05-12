@@ -31,6 +31,8 @@ typedef struct FloatingWindow {
 
 FloatingWindow *floatingWindow = NULL;
 
+bool renderBorders = true;
+
 #define is_in_rect(row, col, rowRect, colRect, height, width)                  \
   (row >= rowRect && row < rowRect + height && col >= colRect &&               \
    col < colRect + width)
@@ -85,9 +87,11 @@ void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
       pane_count = currentWindow->pane_count; // Needed when deleting a pane
       layout = currentWindow->layout;         // Needed when changing layout
       currentWindow->rerender = false;
+      renderBorders = true;
     }
   }
 
+  bool styleChanged = false;
   int paneRow = row + pane->process->scrolloffset;
   for (int col = pane->col; col < pane->col + pane->width; col++) {
     VTermPos pos;
@@ -113,6 +117,7 @@ void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
       if (compare_cells(&cell, &prevCells[idx])) {
         prevCells[idx] = cell;
         draw_cell(&cell, windowRow + 1, col + 1);
+        styleChanged = true; // TODO: Investigate this
       }
     } else {
       write_position(windowRow + 1, col + 1);
@@ -120,7 +125,10 @@ void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
       // draw_history_row(-paneRow, windowRow, pane);
     }
   }
-  clear_style();
+
+  if (styleChanged) {
+    clear_style();
+  }
 }
 
 VTermScreenCell *get_history_cell(ScrollBackLines scrollback, int row,
@@ -237,11 +245,14 @@ void render_screen(int fd) {
       Pane *pane = &currentWindow->panes[k];
       draw_pane(pane, currentWindow);
     }
-    // TODO: Don't draw borders if not necessary
-    if (neotmux->barPos == BAR_BOTTOM) {
-      draw_borders(currentWindow, 0);
-    } else {
-      draw_borders(currentWindow, 1);
+
+    if (renderBorders) {
+      renderBorders = false;
+      if (neotmux->barPos == BAR_BOTTOM) {
+        draw_borders(currentWindow, 0);
+      } else {
+        draw_borders(currentWindow, 1);
+      }
     }
   }
 
@@ -254,7 +265,6 @@ void render_screen(int fd) {
 }
 
 void render(int fd, RenderType type) {
-  // TODO: Combine into one
   if (type == RENDER_SCREEN) {
     render_screen(fd);
   } else if (type == RENDER_BAR) {

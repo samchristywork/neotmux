@@ -77,7 +77,6 @@ bool receive_message(int sock) {
     }
     if (rawMode) {
       write(STDOUT_FILENO, server_reply, read_size);
-      // fflush(stdout);
     }
   } else {
     puts("Timeout (This should not happen)");
