@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g
+CFLAGS=-g -Wall -Wpedantic -Wextra -Werror
 LIBS=-lreadline -lvterm -llua5.4
 
 all: build/ntmux
@@ -8,15 +8,15 @@ all: build/ntmux
 objects: $(patsubst src/%.c, build/%.o, $(wildcard src/*.c))
 
 build/ntmux: src/*.c src/*.h objects
-	mkdir -p build
+	@mkdir -p build
 	${CC} ${CFLAGS} build/*.o -o build/ntmux ${LIBS}
 
 build/%.o: src/%.c src/*.h
-	mkdir -p build
+	@mkdir -p build
 	${CC} ${CFLAGS} -c $< -o $@ ${LIBS}
 
 simple:
-	mkdir -p build
+	@mkdir -p build
 	${CC} ${CFLAGS} src/*.c -o build/ntmux ${LIBS}
 
 run: build/ntmux
