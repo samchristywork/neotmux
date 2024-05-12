@@ -60,7 +60,7 @@ bool receive_message(int sock) {
   FD_ZERO(&fds);
   FD_SET(sock, &fds);
 
-#define len 2000 // TODO: Tune this value
+#define len 4000 // TODO: Tune this value
   static char server_reply[len];
   int retval = select(sock + 1, &fds, NULL, NULL, NULL);
   if (retval == -1) {
@@ -246,7 +246,7 @@ void *handle_events(void *socket_desc) {
       }
 
       if (n == 1 && buf[1] == 'q') {
-        break;
+        write_message(sock, "cQuit", 5);
       }
 
       if (mode == MODE_CONTROL_STICKY) {
