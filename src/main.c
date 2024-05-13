@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
   bool use_unix = get_arg_bool(argc, argv, 'u', true);
   char *name = get_arg_string(argc, argv, 'n', "local");
   char *log_filename = get_arg_string(argc, argv, 'l', "ntmux.log");
-  //int port = get_arg_int(argc, argv, 'p', 5097);
+  // int port = get_arg_int(argc, argv, 'p', 5097);
 
   if (version) {
     printf("%s\n\n%s\n", VERSION_STRING, LICENSE_STRING);

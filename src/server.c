@@ -188,7 +188,7 @@ void *handle_client(void *socket_desc) {
     FD_SET(socket, &fds);
     int max_fd = socket;
 
-    pthread_mutex_lock(&neotmux->mutex);
+    // pthread_mutex_lock(&neotmux->mutex);
     for (int i = 0; i < neotmux->session_count; i++) {
       Session *session = &neotmux->sessions[i];
       if (session[i].current_window < 0) {
@@ -261,7 +261,6 @@ void *handle_client(void *socket_desc) {
         WRITE_LOG(socket, "No windows");
         die();
       }
-
       run_command(socket, "cRenderScreen", 13);
       dirty = false;
     }
@@ -270,7 +269,7 @@ void *handle_client(void *socket_desc) {
       run_command(socket, "cRenderBar", 10);
     }
     frame++;
-    pthread_mutex_unlock(&neotmux->mutex);
+    // pthread_mutex_unlock(&neotmux->mutex);
   }
 
   free(socket_desc);

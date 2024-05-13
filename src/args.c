@@ -5,7 +5,7 @@
 
 #include "args.h"
 
-Arg args[52];
+Arg args[52] = {0};
 int max_name_len = 0;
 
 void add_arg(char short_name, const char *long_name, const char *description,
