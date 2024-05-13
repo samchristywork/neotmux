@@ -29,6 +29,10 @@ ssize_t write_message(int sock, char *buf, size_t len) {
   return write(sock, buf, len);
 }
 
+ssize_t write_string(int sock, char *buf) {
+  return write_message(sock, buf, strlen(buf));
+}
+
 void enable_mouse_tracking() {
   write(STDOUT_FILENO, "\033[?1003h", 8); // Mouse tracking
   // write(STDOUT_FILENO, "\033[?1006h", 8); // Extended mouse tracking
@@ -104,7 +108,7 @@ void handle_binding(size_t numRead, char *buf, int sock, char *command,
                     char *binding) {
   if (numRead == strlen(binding) &&
       strncmp(buf + 1, binding, strlen(binding)) == 0) {
-    write_message(sock, command, strlen(command));
+    write_string(sock, command);
   }
 }
 
@@ -130,7 +134,7 @@ void handle_rename(int sock, char *prompt, char *default_name, char *command) {
 
   if (strlen(input) > 0) {
     sprintf(buf, "%s %s", command, input);
-    write_message(sock, buf, strlen(buf));
+    write_string(sock, buf);
   }
   enter_raw_mode();
 }
@@ -165,7 +169,7 @@ bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
     lua_call(L, 1, 1);
     if (lua_isstring(L, -1)) {
       const char *command = lua_tostring(L, -1);
-      write_message(sock, (char *)command, strlen(command));
+      write_string(sock, (char *)command);
       lua_pop(L, 1);
       return true;
     }
@@ -184,7 +188,7 @@ bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
     lua_call(L, 1, 1);
     if (lua_isstring(L, -1)) {
       const char *command = lua_tostring(L, -1);
-      write_message(sock, (char *)command, strlen(command));
+      write_string(sock, (char *)command);
       lua_pop(L, 1);
       return true;
     }
@@ -277,7 +281,7 @@ void *handle_events(void *socket_desc) {
       }
 
       if (n == 1 && buf[1] == 'q') {
-        write_message(sock, "cQuit", 5);
+        write_string(sock, "cQuit");
       }
 
       if (mode == MODE_CONTROL_STICKY) {
