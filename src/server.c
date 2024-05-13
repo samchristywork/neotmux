@@ -228,8 +228,8 @@ void *handle_client(void *socket_desc) {
           }
 
           // TODO: Tune this number
-          static char buf[8000];
-          int read_size = read(p->process->fd, buf, 8000);
+          static char buf[32000];
+          int read_size = read(p->process->fd, buf, 32000);
           if (read_size == 0) {
             WRITE_LOG(socket, "Process disconnected (%d)", p->process->fd);
             exit(EXIT_FAILURE);

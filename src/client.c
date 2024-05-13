@@ -64,7 +64,7 @@ bool receive_message(int sock) {
   FD_ZERO(&fds);
   FD_SET(sock, &fds);
 
-#define len 4000 // TODO: Tune this value
+#define len 80000 // TODO: Tune this value
   static char server_reply[len];
   int retval = select(sock + 1, &fds, NULL, NULL, NULL);
   if (retval == -1) {
