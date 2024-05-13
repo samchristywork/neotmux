@@ -208,6 +208,7 @@ void handle_command(int socket, char *buf, int read_size) {
     // Cycle the status bar
   } else if (strcmp(cmd, "CycleStatus") == 0) {
     neotmux->statusBarIdx++;
+    render(socket, RENDER_BAR);
 
     // List all the sessions
   } else if (strcmp(cmd, "List") == 0) {
