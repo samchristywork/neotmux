@@ -268,6 +268,18 @@ void *handle_events(void *socket_desc) {
         handle_rename(sock, "Rename Session: ", "", "cRenameSession");
       }
 
+      if (n == 1 && buf[1] == 'g') {
+        reset_mode();
+        printf("\033[?1049l"); // Normal screen
+        printf("\033[2J");     // Clear screen
+        system("./scripts/show_log");
+        printf("\033[?1049h"); // Alternate screen
+        enter_raw_mode();
+        write_string(sock, "cReRender");
+        write_string(sock, "cRenderBar");
+        write_string(sock, "cLog");
+      }
+
       if (n == 1 && buf[1] == 'n') {
         send_size(sock);
       }
