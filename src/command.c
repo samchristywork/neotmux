@@ -181,6 +181,9 @@ void handle_command(int socket, char *buf, int read_size) {
     calculate_layout(w);
     w->current_pane = w->pane_count - 1;
     w->zoom = -1;
+  } else if (strcmp(cmd, "ReRender") == 0) {
+    Window *currentWindow = get_current_window(neotmux);
+    currentWindow->rerender = true;
   } else if (strcmp(cmd, "Split") == 0) {
     Window *w = get_current_window(neotmux);
     add_pane(w, NULL);
@@ -282,9 +285,13 @@ void handle_command(int socket, char *buf, int read_size) {
   } else if (strcmp(cmd, "ScrollUp") == 0) {
     Pane *p = get_current_pane(neotmux);
     p->process->scrolloffset += 1;
+    Window *w = get_current_window(neotmux);
+    w->rerender = true;
   } else if (strcmp(cmd, "ScrollDown") == 0) {
     Pane *p = get_current_pane(neotmux);
     p->process->scrolloffset -= 1;
+    Window *w = get_current_window(neotmux);
+    w->rerender = true;
   } else if (memcmp(cmd, "CreateNamed", 11) == 0) {
     Session *session = get_current_session(neotmux);
     if (session == NULL) {
