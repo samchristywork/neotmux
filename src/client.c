@@ -251,7 +251,7 @@ void *handle_events(void *socket_desc) {
         reset_mode();
         printf("\033[?1049l"); // Normal screen
         printf("\033[2J");     // Clear screen
-        char *ret = execute_command("./scripts/list_commands");
+        char *ret = execute_command("./scripts/list_commands.sh");
         write_string(sock, ret);
         free(ret);
         printf("\033[?1049h"); // Alternate screen
@@ -272,7 +272,7 @@ void *handle_events(void *socket_desc) {
         reset_mode();
         printf("\033[?1049l"); // Normal screen
         printf("\033[2J");     // Clear screen
-        system("./scripts/show_log");
+        system("./scripts/show_log.sh");
         printf("\033[?1049h"); // Alternate screen
         enter_raw_mode();
         write_string(sock, "cReRender");
