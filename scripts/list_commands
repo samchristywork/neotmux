@@ -1,0 +1,3 @@
+#!/bin/bash
+
+printf "c$(grep "strcmp" src/command.c | cut -f 2 -d '"' | sort -u | fzf)"

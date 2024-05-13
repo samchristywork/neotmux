@@ -194,6 +194,25 @@ bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
   return false;
 }
 
+char *execute_command(char *cmd) {
+  FILE *fp;
+  char path[1035];
+
+  fp = popen(cmd, "r");
+  if (fp == NULL) {
+    printf("Failed to run command\n");
+    exit(EXIT_FAILURE);
+  }
+
+  char *ret = NULL;
+  while (fgets(path, sizeof(path) - 1, fp) != NULL) {
+    ret = strdup(path);
+  }
+
+  pclose(fp);
+  return ret;
+}
+
 void *handle_events(void *socket_desc) {
   int sock = *(int *)socket_desc;
   rl_startup_hook = (rl_hook_func_t *)add_readline_history;
@@ -223,6 +242,19 @@ void *handle_events(void *socket_desc) {
       handle_binding(n, buf, sock, "cScrollDown", "\033[6~"); // Page down
 
       handle_lua_binding(n, buf, sock, MODE_CONTROL);
+
+      if (n == 1 && buf[1] == 'o') {
+        reset_mode();
+        printf("\033[?1049l"); // Normal screen
+        printf("\033[2J");     // Clear screen
+        char *ret = execute_command("./scripts/list_commands");
+        write_string(sock, ret);
+        free(ret);
+        printf("\033[?1049h"); // Alternate screen
+        enter_raw_mode();
+        write_string(sock, "cReRender");
+        write_string(sock, "cRenderBar");
+      }
 
       if (n == 1 && buf[1] == 'c') {
         handle_rename(sock, "Name of New Window: ", "", "cCreateNamed");
