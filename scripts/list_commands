@@ -1,3 +1,22 @@
 #!/bin/bash
 
-printf "c$(grep "strcmp" src/command.c | cut -f 2 -d '"' | sort -u | fzf)"
+printf "c$(awk '
+BEGIN {
+  OFS = " "
+}
+/\/\// {
+  doc = $0
+}
+/strcmp/ {
+  match($0, /"([^"]+)"/, a)
+  print a[1], doc
+}
+// {
+  next
+}
+' src/command.c | \
+  sort -u | \
+  sed 's/\s\+\/\// |/g' | \
+  column -t -s '|' | \
+  fzf | \
+  sed 's/\s.\+//')"
