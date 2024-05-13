@@ -109,62 +109,6 @@ void write_status_bar(int socket, int cols) {
   }
 }
 
-#define write_position(row, col)                                               \
-  char buf[32];                                                                \
-  int n = snprintf(buf, 32, "\033[%d;%dH", row, col);                          \
-  buf_write(buf, n);
-
-bool write_cursor_position() {
-  VTermPos cursorPos;
-  Pane *currentPane = get_current_pane(neotmux);
-  if (currentPane) {
-    VTermState *state = vterm_obtain_state(currentPane->process->vt);
-    vterm_state_get_cursorpos(state, &cursorPos);
-    cursorPos.row += currentPane->row - currentPane->process->scrolloffset;
-    cursorPos.col += currentPane->col;
-
-    if (neotmux->barPos == BAR_TOP) {
-      cursorPos.row++;
-    }
-
-    if (cursorPos.row < 0 ||
-        cursorPos.row >= currentPane->height + currentPane->row) {
-      buf_write("\033[?25l", 6); // Hide cursor
-      return false;
-    } else {
-      write_position(cursorPos.row + 1, cursorPos.col + 1);
-      return true;
-    }
-  }
-
-  return false;
-}
-
-void write_cursor_style() {
-  Pane *currentPane = get_current_pane(neotmux);
-  if (currentPane) {
-    if (currentPane->process->cursor.visible) {
-      buf_write("\033[?25h", 6); // Show cursor
-    } else {
-      buf_write("\033[?25l", 6); // Hide cursor
-    }
-
-    switch (currentPane->process->cursor.shape) {
-    case VTERM_PROP_CURSORSHAPE_BLOCK:
-      buf_write("\033[0 q", 6); // Block cursor
-      break;
-    case VTERM_PROP_CURSORSHAPE_UNDERLINE:
-      buf_write("\033[3 q", 6); // Underline cursor
-      break;
-    case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
-      buf_write("\033[5 q", 6); // Vertical bar cursor
-      break;
-    default:
-      break;
-    }
-  }
-}
-
 void render_bar(int fd) {
   buf_write("\033[?25l", 6); // Hide cursor
 
