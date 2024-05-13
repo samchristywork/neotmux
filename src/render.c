@@ -75,9 +75,11 @@ void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
     static Window *window = NULL;
     static int pane_count = 0;
     static Layout layout = 0;
+    static int current_pane = 0;
     if (width != currentWindow->width || height != currentWindow->height ||
         window != currentWindow || currentWindow->pane_count != pane_count ||
-        currentWindow->layout != layout || currentWindow->rerender) {
+        currentWindow->layout != layout || currentWindow->rerender ||
+        currentWindow->current_pane != current_pane) {
       int n = currentWindow->width * currentWindow->height;
       prevCells = realloc(prevCells, n * sizeof(VTermScreenCell));
       bzero(prevCells, n * sizeof(VTermScreenCell));
@@ -86,6 +88,7 @@ void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
       window = currentWindow;                 // Needed when deleting a window
       pane_count = currentWindow->pane_count; // Needed when deleting a pane
       layout = currentWindow->layout;         // Needed when changing layout
+      current_pane = currentWindow->current_pane; // Needed to update border
       currentWindow->rerender = false;
       renderBorders = true;
     }
