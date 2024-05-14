@@ -352,6 +352,7 @@ void start_client(int sock) {
   pthread_join(thread, NULL);
 
   write(STDOUT_FILENO, "\033[?1049l", 8); // Normal screen
+  write(STDOUT_FILENO, "\033[?25h", 6);   // Make cursor visible
 
   close(sock);
 }
