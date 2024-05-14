@@ -1,6 +1,7 @@
 CC=gcc
 CFLAGS=-g -Wall -Wpedantic -Wextra -Werror
 LIBS=-lreadline -lvterm -llua5.4
+TERMINAL=alacritty
 
 all: build/ntmux
 
@@ -20,20 +21,20 @@ simple:
 	${CC} ${CFLAGS} src/*.c -o build/ntmux ${LIBS}
 
 run: build/ntmux
-	unset NTMUX && alacritty -e build/ntmux -n test
+	unset NTMUX && ${TERMINAL} -e build/ntmux -n test
 
-distributed: build/ntmux
-	unset NTMUX && build/ntmux -n distributed -s &
-	unset NTMUX && alacritty -e build/ntmux -n distributed -c
+#run: build/ntmux
+#	unset NTMUX && build/ntmux -n distributed -s &
+#	unset NTMUX && ${TERMINAL} -e build/ntmux -n distributed -c
 
 dev: build/ntmux
-	alacritty -e build/ntmux -n dev -l dev.log
+	${TERMINAL} -e build/ntmux -n dev -l dev.log
 
 server: build/ntmux
 	unset NTMUX && build/ntmux -n distributed -s
 
 client: build/ntmux
-	unset NTMUX && alacritty -e build/ntmux -n distributed -c
+	unset NTMUX && ${TERMINAL} -e build/ntmux -n distributed -c
 
 valgrind: build/ntmux
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=valgrind.log build/ntmux
