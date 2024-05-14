@@ -113,3 +113,29 @@ char *get_arg_string(int argc, char *argv[], char short_name,
   }
   return default_value;
 }
+
+char **get_arg_strings(int argc, char *argv[], char short_name, int *count) {
+  *count = 0;
+
+  Arg arg = get_arg_by_short_name(short_name);
+  for (int i = 1; i < argc; i++) {
+    if (match_short_name(short_name, argv[i]) ||
+        match_long_name(arg.long_name, argv[i])) {
+      if (i + 1 < argc) {
+        int j = i + 1;
+        while (j < argc && argv[j][0] != '-') {
+          (*count)++;
+          j++;
+        }
+        char **ret = (char **)malloc(sizeof(char *) * (*count));
+        j = i + 1;
+        for (int k = 0; k < *count; k++) {
+          ret[k] = argv[j];
+          j++;
+        }
+        return ret;
+      }
+    }
+  }
+  return NULL;
+}
