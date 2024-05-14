@@ -72,6 +72,28 @@ int init_server(char *name) {
   return sock;
 }
 
+int check_client(char *argv[]) {
+  // TODO: Don't check for NTMUX if running only in server mode.
+  if (getenv("NTMUX") != NULL) {
+    fprintf(stderr, "Cannot run Ntmux inside Ntmux\n\n");
+    usage(argv[0]);
+    return EXIT_FAILURE;
+  }
+
+  if (setenv("NTMUX", "true", 1) != 0) {
+    perror("setenv");
+    return EXIT_FAILURE;
+  }
+
+  if (isatty(0) == 0 || isatty(1) == 0 || isatty(2) == 0) {
+    fprintf(stderr, "Ntmux must be run from a terminal\n\n");
+    usage(argv[0]);
+    return EXIT_FAILURE;
+  }
+
+  return EXIT_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
   add_arg('c', "client", "Run Ntmux in client mode", ARG_NONE);
   add_arg('i', "inet", "Use INET sockets", ARG_NONE);
@@ -109,29 +131,25 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  // TODO: Don't check for NTMUX if running only in server mode.
-  if (getenv("NTMUX") != NULL) {
-    fprintf(stderr, "Cannot run Ntmux inside Ntmux\n\n");
-    usage(argv[0]);
-    return EXIT_FAILURE;
-  }
-
-  if (setenv("NTMUX", "true", 1) != 0) {
-    perror("setenv");
-    return EXIT_FAILURE;
-  }
-
   if (client_mode && server_mode) {
     fprintf(stderr, "Cannot run in both client and server mode\n\n");
     usage(argv[0]);
     return EXIT_FAILURE;
   } else if (client_mode && !server_mode) {
+    if (check_client(argv) != 0) {
+      return EXIT_FAILURE;
+    }
+
     int sock = init_client(name);
     return start_client(sock);
   } else if (!client_mode && server_mode) {
     int sock = init_server(name);
     return start_server(sock, name, log_filename);
   } else if (!client_mode && !server_mode) {
+    if (check_client(argv) != 0) {
+      return EXIT_FAILURE;
+    }
+
     pid_t pid = fork();
     if (pid == 0) {
       // Child process
