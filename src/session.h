@@ -91,6 +91,8 @@ typedef struct Neotmux {
   BarPosition barPos;
   int statusBarIdx;
   FILE *log;
+  char **commands;
+  int nCommands;
 } Neotmux;
 
 #define buf_write(buf, count)                                                  \

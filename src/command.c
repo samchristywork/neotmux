@@ -95,15 +95,21 @@ void handle_command(int socket, char *buf, int read_size) {
     Session *s = add_session(neotmux, "Main");
     Window *w = add_window(s, "Main");
 
-    int initial_panes = 3;
-    lua_getglobal(neotmux->lua, "initial_panes");
-    if (lua_isnumber(neotmux->lua, -1)) {
-      initial_panes = lua_tonumber(neotmux->lua, -1);
-    }
-    lua_pop(neotmux->lua, 1);
+    if (neotmux->nCommands != 0) {
+      for (int i = 0; i < neotmux->nCommands; i++) {
+        add_pane(w, neotmux->commands[i]);
+      }
+    } else {
+      int initial_panes = 3;
+      lua_getglobal(neotmux->lua, "initial_panes");
+      if (lua_isnumber(neotmux->lua, -1)) {
+        initial_panes = lua_tonumber(neotmux->lua, -1);
+      }
+      lua_pop(neotmux->lua, 1);
 
-    for (int i = 0; i < initial_panes; i++) {
-      add_pane(w, NULL);
+      for (int i = 0; i < initial_panes; i++) {
+        add_pane(w, NULL);
+      }
     }
     return;
   }

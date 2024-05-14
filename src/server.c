@@ -276,7 +276,7 @@ void *handle_client(void *socket_desc) {
   return 0;
 }
 
-int init_ntmux(char *log_filename) {
+int init_ntmux(char *log_filename, char **commands, int nCommands) {
   neotmux = malloc(sizeof(*neotmux));
   neotmux->log = fopen(log_filename, "w+");
   neotmux->sessions = NULL;
@@ -287,6 +287,8 @@ int init_ntmux(char *log_filename) {
   bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));
   neotmux->barPos = BAR_NONE;
   neotmux->statusBarIdx = 0;
+  neotmux->commands = commands;
+  neotmux->nCommands = nCommands;
 
   return EXIT_SUCCESS;
 }
@@ -300,12 +302,13 @@ void handle_cleanup() {
   fclose(neotmux->log);
 }
 
-void start_server_loop(int socket_desc, char *log_filename) {
+void start_server_loop(int socket_desc, char *log_filename, char **commands,
+                       int nCommands) {
   die_socket_desc = socket_desc;
 
   atexit(handle_cleanup);
 
-  if (init_ntmux(log_filename) == EXIT_FAILURE) {
+  if (init_ntmux(log_filename, commands, nCommands) == EXIT_FAILURE) {
     return;
   }
 
@@ -322,12 +325,13 @@ void start_server_loop(int socket_desc, char *log_filename) {
 
 void handle_ctrl_c() { signal(SIGINT, handle_ctrl_c); }
 
-int start_server(int sock, char *name, char *log_filename) {
+int start_server(int sock, char *name, char *log_filename, char **commands,
+                 int nCommands) {
   signal(SIGINT, handle_ctrl_c);
 
   sockname = name;
 
-  start_server_loop(sock, log_filename);
+  start_server_loop(sock, log_filename, commands, nCommands);
 
   return EXIT_SUCCESS;
 }

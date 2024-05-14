@@ -96,14 +96,15 @@ int check_client(char *argv[]) {
 
 int main(int argc, char *argv[]) {
   add_arg('c', "client", "Run Ntmux in client mode", ARG_NONE);
+  add_arg('e', "command", "Initial commands to run in each pane", ARG_MULTIPLE);
+  add_arg('h', "help", "Show this help message", ARG_NONE);
   add_arg('i', "inet", "Use INET sockets", ARG_NONE);
+  add_arg('l', "log", "Log file to use (default \"ntmux.log\")", ARG_REQUIRED);
   add_arg('n', "name", "Name of the socket (default \"local\")", ARG_REQUIRED);
   add_arg('p', "port", "Port number to use (default 5097)", ARG_REQUIRED);
   add_arg('s', "server", "Run Ntmux in server mode", ARG_NONE);
   add_arg('u', "unix", "Use UNIX sockets (default)", ARG_NONE);
-  add_arg('h', "help", "Show this help message", ARG_NONE);
   add_arg('v', "version", "Show the version number and license info", ARG_NONE);
-  add_arg('l', "log", "Log file to use (default \"ntmux.log\")", ARG_REQUIRED);
 
   bool help = get_arg_bool(argc, argv, 'h', false);
   bool version = get_arg_bool(argc, argv, 'v', false);
@@ -114,6 +115,9 @@ int main(int argc, char *argv[]) {
   char *name = get_arg_string(argc, argv, 'n', "local");
   char *log_filename = get_arg_string(argc, argv, 'l', "ntmux.log");
   // int port = get_arg_int(argc, argv, 'p', 5097);
+
+  int nCommands = 0;
+  char **commands = get_arg_strings(argc, argv, 'e', &nCommands);
 
   if (version) {
     printf("%s\n\n%s\n", VERSION_STRING, LICENSE_STRING);
@@ -144,7 +148,7 @@ int main(int argc, char *argv[]) {
     return start_client(sock);
   } else if (!client_mode && server_mode) {
     int sock = init_server(name);
-    return start_server(sock, name, log_filename);
+    return start_server(sock, name, log_filename, commands, nCommands);
   } else if (!client_mode && !server_mode) {
     if (check_client(argv) != 0) {
       return EXIT_FAILURE;
@@ -157,7 +161,7 @@ int main(int argc, char *argv[]) {
       close(0);
       close(1);
       close(2);
-      return start_server(sock, name, log_filename);
+      return start_server(sock, name, log_filename, commands, nCommands);
     } else if (pid > 0) {
       // Parent process
       int sock = init_client(name);

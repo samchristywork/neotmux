@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-int start_server(int sock, char *name, char *log_filename);
+int start_server(int sock, char *name, char *log_filename, char **commands,
+                 int nCommands);
 
 #endif
