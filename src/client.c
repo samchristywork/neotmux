@@ -137,6 +137,8 @@ void handle_rename(int sock, char *prompt, char *default_name, char *command) {
     write_string(sock, buf);
   }
   enter_raw_mode();
+  write_string(sock, "cReRender");
+  write_string(sock, "cRenderBar");
 }
 
 lua_State *L = NULL;
