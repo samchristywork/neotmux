@@ -92,7 +92,26 @@ bool handle_mouse(int socket, char *buf, int read_size) {
   }
 
   Pane *pane = get_current_pane(neotmux);
-  if (pane->process->cursor.mouse_active != VTERM_PROP_MOUSE_NONE) {
+  if (pane->process->cursor.mouse_active == VTERM_PROP_MOUSE_NONE) {
+    event.x -= pane->col;
+    event.y -= pane->row;
+
+    char buf[6];
+    if (serialize_mouse_event(buf, 6, &event)) {
+      if (event.type == MOUSE_LEFT_CLICK) {
+        pane->selection.active = true;
+        pane->selection.start_col = event.x;
+        pane->selection.start_row = event.y;
+        pane->selection.end_col = event.x;
+        pane->selection.end_row = event.y;
+      } else if (event.type == MOUSE_LEFT_DRAG) {
+        pane->selection.end_col = event.x;
+        pane->selection.end_row = event.y;
+      } else if (event.type == MOUSE_RELEASE) {
+        pane->selection.active = false;
+      }
+    }
+  } else {
     event.x -= pane->col;
     event.y -= pane->row;
 

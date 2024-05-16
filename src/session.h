@@ -47,12 +47,21 @@ typedef struct Process {
   int scrolloffset;
 } Process;
 
+typedef struct Selection {
+  bool active;
+  int start_row;
+  int start_col;
+  int end_row;
+  int end_col;
+} Selection;
+
 typedef struct Pane {
   int row;
   int col;
   int width;
   int height;
   Process *process;
+  Selection selection;
 } Pane;
 
 typedef struct Window {

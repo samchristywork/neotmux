@@ -33,6 +33,7 @@ Pane *add_pane(Window *window, char *cmd) {
   pane->process->cursor.visible = true;
   pane->process->cursor.mouse_active = VTERM_PROP_MOUSE_NONE;
   pane->process->cursor.shape = VTERM_PROP_CURSORSHAPE_BLOCK;
+  pane->selection.active = false;
   window->pane_count++;
 
   add_process_to_pane(pane, cmd);
