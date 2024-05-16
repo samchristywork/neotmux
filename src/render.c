@@ -58,28 +58,43 @@ bool compare_cells(VTermScreenCell *a, VTermScreenCell *b) {
 
 void draw_history_row(int paneRow, int windowRow, Pane *pane);
 
+bool isBetweenCells(VTermPos pos, VTermPos start, VTermPos end) {
+  if (pos.row > start.row && pos.row < end.row) {
+    return true;
+  }
+
+  if (pos.row < start.row || pos.row > end.row) {
+    return false;
+  }
+
+  if (pos.row == start.row && pos.col < start.col) {
+    return false;
+  }
+
+  if (pos.row == end.row && pos.col >= end.col) {
+    return false;
+  }
+
+  return true;
+}
+
 bool isWithinSelection(Selection selection, VTermPos pos) {
   if (!selection.active) {
     return false;
   }
 
-  if (pos.row > selection.start.row && pos.row < selection.end.row) {
+  VTermPos start = selection.start;
+  VTermPos end = selection.end;
+
+  if (isBetweenCells(pos, start, end)) {
     return true;
   }
 
-  if (pos.row < selection.start.row || pos.row > selection.end.row) {
-    return false;
+  if (isBetweenCells(pos, end, start)) {
+    return true;
   }
 
-  if (pos.row == selection.start.row && pos.col < selection.start.col) {
-    return false;
-  }
-
-  if (pos.row == selection.end.row && pos.col >= selection.end.col) {
-    return false;
-  }
-
-  return true;
+  return false;
 }
 
 void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
