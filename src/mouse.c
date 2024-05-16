@@ -101,6 +101,12 @@ bool handle_mouse(int socket, char *buf, int read_size) {
       if (event.type == MOUSE_LEFT_CLICK) {
         write(pane->process->fd, buf, 6);
         return true;
+      } else if (event.type == MOUSE_LEFT_DRAG) {
+        write(pane->process->fd, buf, 6);
+        return true;
+      } else if (event.type == MOUSE_RELEASE) {
+        write(pane->process->fd, buf, 6);
+        return true;
       }
       // TODO: Implement other mouse events
     }
