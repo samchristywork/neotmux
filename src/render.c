@@ -63,19 +63,19 @@ bool isWithinSelection(Selection selection, VTermPos pos) {
     return false;
   }
 
-  if (pos.row > selection.start_row && pos.row < selection.end_row) {
+  if (pos.row > selection.start.row && pos.row < selection.end.row) {
     return true;
   }
 
-  if (pos.row < selection.start_row || pos.row > selection.end_row) {
+  if (pos.row < selection.start.row || pos.row > selection.end.row) {
     return false;
   }
 
-  if (pos.row == selection.start_row && pos.col < selection.start_col) {
+  if (pos.row == selection.start.row && pos.col < selection.start.col) {
     return false;
   }
 
-  if (pos.row == selection.end_row && pos.col >= selection.end_col) {
+  if (pos.row == selection.end.row && pos.col >= selection.end.col) {
     return false;
   }
 

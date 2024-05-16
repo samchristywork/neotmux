@@ -49,10 +49,8 @@ typedef struct Process {
 
 typedef struct Selection {
   bool active;
-  int start_row;
-  int start_col;
-  int end_row;
-  int end_col;
+  VTermPos start;
+  VTermPos end;
 } Selection;
 
 typedef struct Pane {
