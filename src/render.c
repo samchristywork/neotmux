@@ -58,6 +58,30 @@ bool compare_cells(VTermScreenCell *a, VTermScreenCell *b) {
 
 void draw_history_row(int paneRow, int windowRow, Pane *pane);
 
+bool isWithinSelection(Selection selection, VTermPos pos) {
+  if (!selection.active) {
+    return false;
+  }
+
+  if (pos.row > selection.start_row && pos.row < selection.end_row) {
+    return true;
+  }
+
+  if (pos.row < selection.start_row || pos.row > selection.end_row) {
+    return false;
+  }
+
+  if (pos.row == selection.start_row && pos.col < selection.start_col) {
+    return false;
+  }
+
+  if (pos.row == selection.end_row && pos.col >= selection.end_col) {
+    return false;
+  }
+
+  return true;
+}
+
 void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
   if (neotmux->barPos == BAR_TOP) {
     windowRow += 1;
@@ -119,13 +143,7 @@ void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
       VTermScreenCell cell = {0};
       vterm_screen_get_cell(vts, pos, &cell);
 
-      if (pos.col == pane->selection.start_col &&
-          pos.row == pane->selection.start_row) {
-        cell.attrs.reverse = 1;
-      }
-
-      if (pos.col == pane->selection.end_col &&
-          pos.row == pane->selection.end_row) {
+      if (isWithinSelection(pane->selection, pos)) {
         cell.attrs.reverse = 1;
       }
 
