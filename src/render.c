@@ -119,6 +119,16 @@ void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
       VTermScreenCell cell = {0};
       vterm_screen_get_cell(vts, pos, &cell);
 
+      if (pos.col == pane->selection.start_col &&
+          pos.row == pane->selection.start_row) {
+        cell.attrs.reverse = 1;
+      }
+
+      if (pos.col == pane->selection.end_col &&
+          pos.row == pane->selection.end_row) {
+        cell.attrs.reverse = 1;
+      }
+
       int idx = col + windowRow * currentWindow->width;
       if (compare_cells(&cell, &prevCells[idx])) {
         prevCells[idx] = cell;
