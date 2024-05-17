@@ -104,13 +104,16 @@ bool handle_mouse(int socket, char *buf, int read_size) {
         pane->selection.start.row = event.y;
         pane->selection.end.col = event.x;
         pane->selection.end.row = event.y;
+        handle_command(socket, "cReRender", 10);
         handle_command(socket, "cRenderScreen", 14);
       } else if (event.type == MOUSE_LEFT_DRAG) {
         pane->selection.end.col = event.x;
         pane->selection.end.row = event.y;
+        handle_command(socket, "cReRender", 10);
         handle_command(socket, "cRenderScreen", 14);
       } else if (event.type == MOUSE_RELEASE) {
         pane->selection.active = false;
+        handle_command(socket, "cReRender", 10);
         handle_command(socket, "cRenderScreen", 14);
       }
     }
