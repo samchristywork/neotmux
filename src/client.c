@@ -299,6 +299,10 @@ void *handle_events(void *socket_desc) {
         write_string(sock, "cModeControlSticky");
       }
 
+      if (n == 1 && buf[1] == 'y') {
+        write_string(sock, "cCopySelection");
+      }
+
       if (n == 1 && buf[1] == 'q') {
         write_string(sock, "cQuit");
       }

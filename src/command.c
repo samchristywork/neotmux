@@ -354,6 +354,12 @@ void handle_command(int socket, char *buf, int read_size) {
   } else if (strcmp(cmd, "ReloadLua") == 0) {
     load_plugins(socket);
 
+    // Copy the current selection to the clipboard
+  } else if (strcmp(cmd, "CopySelection") == 0) {
+    Pane *pane = get_current_pane(neotmux);
+    copy_selection_to_clipboard(pane);
+    pane->selection.active = false;
+
     // Quit the program
   } else if (strcmp(cmd, "Quit") == 0) {
     close(socket);
