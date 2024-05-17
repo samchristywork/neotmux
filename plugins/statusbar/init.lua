@@ -5,9 +5,10 @@ function system(cmd)
   return l
 end
 
-function statusbar_left(sessionName, windowTitles)
+function statusbar_left(sessionName, windowTitles, mode)
   left = ""
-  left = left .. "[" .. sessionName .. "]"
+  left = left .. mode
+  left = left .. " [" .. sessionName .. "]"
   for i, e in ipairs(windowTitles) do
     left = left .. "  " .. e.title
     if e.active then
@@ -43,8 +44,8 @@ function statusbar_right(idx, numBars)
   end
 end
 
-function statusbar(idx, cols, sessionName, windowTitles)
-  left = statusbar_left(sessionName, windowTitles)
+function statusbar(idx, cols, sessionName, windowTitles, mode)
+  left = statusbar_left(sessionName, windowTitles, mode)
   right, width = statusbar_right(idx, numBars)
   padding = string.rep(" ", cols - #left - width)
   return left .. padding .. right
