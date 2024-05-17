@@ -1,6 +1,6 @@
 #include <unistd.h>
 
-#include "command.h"
+#include "server.h"
 #include "session.h"
 
 extern Neotmux *neotmux;
@@ -104,26 +104,26 @@ bool handle_mouse(int socket, char *buf, int read_size) {
         pane->selection.start.row = event.y;
         pane->selection.end.col = event.x;
         pane->selection.end.row = event.y;
-        handle_command(socket, "cReRender", 10);
-        handle_command(socket, "cRenderScreen", 14);
-        handle_command(socket, "cRenderBar", 11);
+        run_command(socket, "cReRender", 10);
+        run_command(socket, "cRenderScreen", 14);
+        run_command(socket, "cRenderBar", 11);
       } else if (event.type == MOUSE_LEFT_DRAG) {
         pane->selection.end.col = event.x;
         pane->selection.end.row = event.y;
-        handle_command(socket, "cReRender", 10);
-        handle_command(socket, "cRenderScreen", 14);
-        handle_command(socket, "cRenderBar", 11);
+        run_command(socket, "cReRender", 10);
+        run_command(socket, "cRenderScreen", 14);
+        run_command(socket, "cRenderBar", 11);
       } else if (event.type == MOUSE_RELEASE) {
         if (pane->selection.start.col == event.x &&
             pane->selection.start.row == event.y) {
           pane->selection.active = false;
-          handle_command(socket, "cReRender", 10);
-          handle_command(socket, "cRenderScreen", 14);
-          handle_command(socket, "cRenderBar", 11);
+          run_command(socket, "cReRender", 10);
+          run_command(socket, "cRenderScreen", 14);
+          run_command(socket, "cRenderBar", 11);
         }
         // pane->selection.active = false;
-        // handle_command(socket, "cReRender", 10);
-        // handle_command(socket, "cRenderScreen", 14);
+        // run_command(socket, "cReRender", 10);
+        // run_command(socket, "cRenderScreen", 14);
       }
     }
   } else {
