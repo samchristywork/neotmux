@@ -58,7 +58,12 @@ bool compare_cells(VTermScreenCell *a, VTermScreenCell *b) {
 
 void draw_history_row(int paneRow, int windowRow, Pane *pane);
 
-bool isBetweenCells(VTermPos pos, VTermPos start, VTermPos end) {
+// TODO: Add module
+bool is_between_cells(VTermPos pos, VTermPos start, VTermPos end) {
+  start.col--;
+  start.row--;
+  end.row--;
+
   if (pos.row > start.row && pos.row < end.row) {
     return true;
   }
@@ -78,7 +83,7 @@ bool isBetweenCells(VTermPos pos, VTermPos start, VTermPos end) {
   return true;
 }
 
-bool isWithinSelection(Selection selection, VTermPos pos) {
+bool is_within_selection(Selection selection, VTermPos pos) {
   if (!selection.active) {
     return false;
   }
@@ -86,11 +91,11 @@ bool isWithinSelection(Selection selection, VTermPos pos) {
   VTermPos start = selection.start;
   VTermPos end = selection.end;
 
-  if (isBetweenCells(pos, start, end)) {
+  if (is_between_cells(pos, start, end)) {
     return true;
   }
 
-  if (isBetweenCells(pos, end, start)) {
+  if (is_between_cells(pos, end, start)) {
     return true;
   }
 
@@ -158,7 +163,7 @@ void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
       VTermScreenCell cell = {0};
       vterm_screen_get_cell(vts, pos, &cell);
 
-      if (isWithinSelection(pane->selection, pos)) {
+      if (is_within_selection(pane->selection, pos)) {
         cell.attrs.reverse = 1;
       }
 

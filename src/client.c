@@ -262,8 +262,6 @@ void *handle_events(void *socket_desc) {
         free(ret);
         printf("\033[?1049h"); // Alternate screen
         enter_raw_mode();
-        write_string(sock, "cReRender");
-        write_string(sock, "cRenderBar");
       }
 
       if (n == 1 && buf[1] == 'c') {
@@ -281,8 +279,6 @@ void *handle_events(void *socket_desc) {
         system("./scripts/show_log.sh");
         printf("\033[?1049h"); // Alternate screen
         enter_raw_mode();
-        write_string(sock, "cReRender");
-        write_string(sock, "cRenderBar");
         write_string(sock, "cLog");
       }
 
@@ -318,6 +314,9 @@ void *handle_events(void *socket_desc) {
         mode = MODE_NORMAL;
         write_string(sock, "cModeNormal");
       }
+
+      write_string(sock, "cReRender");
+      write_string(sock, "cRenderBar");
     }
   }
 
