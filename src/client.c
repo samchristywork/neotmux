@@ -16,8 +16,9 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "client.h"
+
 struct termios term;
-typedef enum Mode { MODE_NORMAL, MODE_CONTROL, MODE_CONTROL_STICKY } Mode;
 fd_set fds;
 
 // Write a u32 representing the size of the message followed by the message
@@ -225,6 +226,8 @@ void *handle_events(void *socket_desc) {
   enter_raw_mode();
 
   Mode mode = MODE_NORMAL;
+  write_string(sock, "cModeNormal");
+
   char buf[32];
   buf[0] = 'e';
   while (1) {
@@ -236,6 +239,7 @@ void *handle_events(void *socket_desc) {
       if (handle_lua_binding(n, buf, sock, MODE_NORMAL)) {
       } else if (n == 1 && buf[1] == 1) { // Ctrl-A
         mode = MODE_CONTROL;
+        write_string(sock, "cModeControl");
       } else if (n == 1 && buf[1] == 10) { // Enter
         buf[1] = 13;                       // Change newline to carriage return
         write_message(sock, buf, n + 1);
@@ -292,6 +296,7 @@ void *handle_events(void *socket_desc) {
 
       if (n == 1 && buf[1] == 's') {
         mode = MODE_CONTROL_STICKY;
+        write_string(sock, "cModeControlSticky");
       }
 
       if (n == 1 && buf[1] == 'q') {
@@ -301,11 +306,13 @@ void *handle_events(void *socket_desc) {
       if (mode == MODE_CONTROL_STICKY) {
         if (n == 1 && buf[1] == 1) { // Ctrl-A
           mode = MODE_NORMAL;
+          write_string(sock, "cModeNormal");
         }
       }
 
       if (mode == MODE_CONTROL) {
         mode = MODE_NORMAL;
+        write_string(sock, "cModeNormal");
       }
     }
   }
@@ -340,7 +347,7 @@ void handle_sigint(int sig) {
   signal(sig, handle_sigint);
 }
 
-void start_client(int sock) {
+int start_client(int sock) {
   signal(SIGINT, handle_sigint);
 
   write(STDOUT_FILENO, "\033[?1049h", 8); // Alternate screen
@@ -357,4 +364,6 @@ void start_client(int sock) {
   write(STDOUT_FILENO, "\033[?25h", 6);   // Make cursor visible
 
   close(sock);
+
+  return EXIT_SUCCESS;
 }

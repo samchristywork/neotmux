@@ -6,6 +6,8 @@
 #include <string.h>
 #include <vterm.h>
 
+#include "client.h"
+
 typedef enum Layout {
   LAYOUT_DEFAULT = 0,
   LAYOUT_EVEN_HORIZONTAL,
@@ -100,6 +102,7 @@ typedef struct Neotmux {
   FILE *log;
   char **commands;
   int nCommands;
+  Mode mode;
 } Neotmux;
 
 #define buf_write(buf, count)                                                  \

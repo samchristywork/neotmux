@@ -335,6 +335,21 @@ void handle_command(int socket, char *buf, int read_size) {
     char *title = strdup(cmd + 14);
     session->title = title;
 
+    // Tell the server that the client is in Normal mode
+  } else if (strcmp(cmd, "ModeNormal") == 0) {
+    neotmux->mode = MODE_NORMAL;
+    render(socket, RENDER_BAR);
+
+    // Tell the server that the client is in Control mode
+  } else if (strcmp(cmd, "ModeControl") == 0) {
+    neotmux->mode = MODE_CONTROL;
+    render(socket, RENDER_BAR);
+
+    // Tell the server that the client is in Sticky Control mode
+  } else if (strcmp(cmd, "ModeControlSticky") == 0) {
+    neotmux->mode = MODE_CONTROL_STICKY;
+    render(socket, RENDER_BAR);
+
     // Reload the Lua plugins
   } else if (strcmp(cmd, "ReloadLua") == 0) {
     load_plugins(socket);
