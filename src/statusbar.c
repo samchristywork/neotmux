@@ -47,18 +47,18 @@ char *call_statusbar_function(int socket, int cols, lua_State *lua,
   }
 
   switch (neotmux->mode) {
-    case MODE_NORMAL:
-      lua_pushstring(lua, "N");
-      break;
-    case MODE_CONTROL:
-      lua_pushstring(lua, "C");
-      break;
-    case MODE_CONTROL_STICKY:
-      lua_pushstring(lua, "S");
-      break;
-    default:
-      lua_pushstring(lua, "U");
-      break;
+  case MODE_NORMAL:
+    lua_pushstring(lua, "N");
+    break;
+  case MODE_CONTROL:
+    lua_pushstring(lua, "C");
+    break;
+  case MODE_CONTROL_STICKY:
+    lua_pushstring(lua, "S");
+    break;
+  default:
+    lua_pushstring(lua, "U");
+    break;
   }
 
   lua_call(lua, 5, 1);
