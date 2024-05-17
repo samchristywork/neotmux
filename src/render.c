@@ -249,6 +249,9 @@ void draw_history_row(int paneRow, int windowRow, Pane *pane) {
 // }
 
 void draw_pane(Pane *pane, Window *window) {
+  if (pane->process->cursor.mouse_active != VTERM_PROP_MOUSE_NONE) {
+    pane->selection.active = false;
+  }
   clear_style();
   for (int row = 0; row < pane->height; row++) {
     int windowRow = pane->row + row;
