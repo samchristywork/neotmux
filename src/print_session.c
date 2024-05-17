@@ -9,124 +9,136 @@
 
 extern Neotmux *neotmux;
 
-// TODO: Make this work with WRITE_LOG
-void print_layout(Layout layout, int socket) {
-  switch (layout) {
-  case LAYOUT_DEFAULT:
-    WRITE_LOG(socket, "Default");
-    break;
-  case LAYOUT_EVEN_HORIZONTAL:
-    WRITE_LOG(socket, "Even Horizontal");
-    break;
-  case LAYOUT_EVEN_VERTICAL:
-    WRITE_LOG(socket, "Even Vertical");
-    break;
-  case LAYOUT_MAIN_HORIZONTAL:
-    WRITE_LOG(socket, "Main Horizontal");
-    break;
-  case LAYOUT_MAIN_VERTICAL:
-    WRITE_LOG(socket, "Main Vertical");
-    break;
-  case LAYOUT_TILED:
-    WRITE_LOG(socket, "Tiled");
-    break;
-  default:
-    WRITE_LOG(socket, "Unknown");
-    break;
-  }
+#define LOG(fmt, ...) fprintf(neotmux->log, fmt, ##__VA_ARGS__)
+
+void print_selection(Selection *selection) {
+  LOG("      Selection: %s\n", selection->active ? "Active" : "Inactive");
+  LOG("        Start: %d, %d\n", selection->start.col, selection->start.row);
+  LOG("        End: %d, %d\n", selection->end.col, selection->end.row);
 }
 
-void print_cursor_shape(int cursor_shape, int socket) {
+void print_cursor_shape(int cursor_shape) {
   switch (cursor_shape) {
   case 0:
-    WRITE_LOG(socket, "Default");
+    LOG("          Shape: Default\n");
     break;
   case VTERM_PROP_CURSORSHAPE_BLOCK:
-    WRITE_LOG(socket, "Block");
+    LOG("          Shape: Block\n");
     break;
   case VTERM_PROP_CURSORSHAPE_UNDERLINE:
-    WRITE_LOG(socket, "Underline");
+    LOG("          Shape: Underline\n");
     break;
   case VTERM_PROP_CURSORSHAPE_BAR_LEFT:
-    WRITE_LOG(socket, "Bar Left");
+    LOG("          Shape: Bar Left\n");
     break;
   default:
-    WRITE_LOG(socket, "Unknown");
+    LOG("          Shape: Unknown\n");
     break;
   }
-
-  WRITE_LOG(socket, "\n");
 }
 
-void print_process_cwd(pid_t pid, int socket) {
+void print_cursor(Cursor *cursor) {
+  LOG("        Cursor: %s\n", cursor->mouse_active ? "Active" : "Inactive");
+  LOG("          Visible: %s\n", cursor->visible ? "True" : "False");
+  print_cursor_shape(cursor->shape);
+}
+
+void print_scroll_back_lines(ScrollBackLines *scrollback) {
+  LOG("        Scrollback: %zu/%zu\n", scrollback->size, scrollback->capacity);
+}
+
+void print_cwd(pid_t pid) {
   char cwd[PATH_MAX] = {0};
   char link[PATH_MAX] = {0};
   sprintf(link, "/proc/%d/cwd", pid);
   if (readlink(link, cwd, sizeof(cwd)) != -1) {
-    WRITE_LOG(socket, "        cwd: %s\n", cwd);
+    LOG("        CWD: %s\n", cwd);
   }
 }
 
-void print_cursor(Cursor *cursor, int socket) {
-  WRITE_LOG(socket, "          mouse_active: %s\n",
-            cursor->mouse_active ? "True" : "False");
-  WRITE_LOG(socket, "          shape: ");
-  print_cursor_shape(cursor->shape, socket);
-  WRITE_LOG(socket, "          visible: %s\n",
-            cursor->visible ? "True" : "False");
-}
-
-void print_process(Process *process, int socket) {
+void print_process(Process *process) {
   if (process->pid != -1) {
-    WRITE_LOG(socket, "      Process: %s\n", process->name);
-    WRITE_LOG(socket, "        pid: %d\n", process->pid);
-    WRITE_LOG(socket, "        fd: %d\n", process->fd);
-    WRITE_LOG(socket, "        closed: %s\n",
-              process->closed ? "True" : "False");
-    WRITE_LOG(socket, "        cursor:\n");
-    print_cursor(&process->cursor, socket);
-    print_process_cwd(process->pid, socket);
+    LOG("      Process: %s\n", process->name);
+    LOG("        PID: %d\n", process->pid);
+    LOG("        FD: %d\n", process->fd);
+    LOG("        Closed: %s\n", process->closed ? "True" : "False");
+    LOG("        Scrolloffset: %d\n", process->scrolloffset);
+    print_scroll_back_lines(&process->scrollback);
+    print_cwd(process->pid);
+    print_cursor(&process->cursor);
   } else {
-    WRITE_LOG(socket, "      Process: %s\n", "None");
+    LOG("      Process: %s\n", "None");
   }
 }
 
-void print_pane(Pane *pane, int socket) {
-  WRITE_LOG(socket, "    Pane: %p\n", (void *)pane);
-  WRITE_LOG(socket, "      col: %d\n", pane->col);
-  WRITE_LOG(socket, "      row: %d\n", pane->row);
-  WRITE_LOG(socket, "      width: %d\n", pane->width);
-  WRITE_LOG(socket, "      height: %d\n", pane->height);
-  print_process(pane->process, socket);
+void print_pane(Pane *pane) {
+  LOG("    Pane: %p\n", (void *)pane);
+  LOG("      Col: %d\n", pane->col);
+  LOG("      Row: %d\n", pane->row);
+  LOG("      Width: %d\n", pane->width);
+  LOG("      Height: %d\n", pane->height);
+
+  print_selection(&pane->selection);
+  print_process(pane->process);
 }
 
-void print_window(Window *window, int socket) {
-  WRITE_LOG(socket, "  Window: %s\n", window->title);
-  WRITE_LOG(socket, "    Pane Count: %d\n", window->pane_count);
-  WRITE_LOG(socket, "    Current Pane: %d\n", window->current_pane);
-  WRITE_LOG(socket, "    Layout: ");
-  print_layout(window->layout, socket);
-  WRITE_LOG(socket, "\n");
-  for (int j = 0; j < window->pane_count; j++) {
-    Pane *pane = &window->panes[j];
-    print_pane(pane, socket);
+void print_layout(Layout layout) {
+  switch (layout) {
+  case LAYOUT_DEFAULT:
+    LOG("    Layout: Default\n");
+    break;
+  case LAYOUT_EVEN_HORIZONTAL:
+    LOG("    Layout: Even Horizontal\n");
+    break;
+  case LAYOUT_EVEN_VERTICAL:
+    LOG("    Layout: Even Vertical\n");
+    break;
+  case LAYOUT_MAIN_HORIZONTAL:
+    LOG("    Layout: Main Horizontal\n");
+    break;
+  case LAYOUT_MAIN_VERTICAL:
+    LOG("    Layout: Main Vertical\n");
+    break;
+  case LAYOUT_TILED:
+    LOG("    Layout: Tiled\n");
+    break;
+  default:
+    LOG("    Layout: Unknown\n");
+    break;
   }
 }
 
-void print_session(Session *session, int socket) {
-  WRITE_LOG(socket, "Session: %s\n", session->title);
-  WRITE_LOG(socket, "  Window Count: %d\n", session->window_count);
-  WRITE_LOG(socket, "  Current Window: %d\n", session->current_window);
+void print_window(Window *window) {
+  LOG("  Window: %s\n", window->title);
+  LOG("    Width: %d\n", window->width);
+  LOG("    Height: %d\n", window->height);
+  if (window->zoom == -1) {
+    LOG("    Zoom: None\n");
+  } else {
+    LOG("    Zoom: %d\n", window->zoom);
+  }
+  LOG("    Current Pane: %d\n", window->current_pane);
+  print_layout(window->layout);
+
+  for (int i = 0; i < window->pane_count; i++) {
+    print_pane(&window->panes[i]);
+  }
+}
+
+void print_session(Session *session) {
+  LOG("Session: %s\n", session->title);
+  LOG(" Current Window: %d\n", session->current_window);
   for (int i = 0; i < session->window_count; i++) {
-    Window *window = &session->windows[i];
-    print_window(window, socket);
+    print_window(&session->windows[i]);
   }
 }
 
 void print_sessions(Neotmux *neotmux, int socket) {
+  WRITE_LOG(socket, "Printing Sessions");
+
   int count = neotmux->session_count;
   Session *sessions = neotmux->sessions;
   for (int i = 0; i < count; i++) {
-    print_session(&sessions[i], socket);
+    print_session(&sessions[i]);
   }
 }
