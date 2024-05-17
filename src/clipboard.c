@@ -1,8 +1,50 @@
 #include <unistd.h>
 
-#include "render.h"
-#include "render_cell.h"
 #include "session.h"
+#include "utf8.h"
+
+bool is_between_cells(VTermPos pos, VTermPos start, VTermPos end) {
+  start.col--;
+  start.row--;
+  end.row--;
+
+  if (pos.row > start.row && pos.row < end.row) {
+    return true;
+  }
+
+  if (pos.row < start.row || pos.row > end.row) {
+    return false;
+  }
+
+  if (pos.row == start.row && pos.col < start.col) {
+    return false;
+  }
+
+  if (pos.row == end.row && pos.col >= end.col) {
+    return false;
+  }
+
+  return true;
+}
+
+bool is_within_selection(Selection selection, VTermPos pos) {
+  if (!selection.active) {
+    return false;
+  }
+
+  VTermPos start = selection.start;
+  VTermPos end = selection.end;
+
+  if (is_between_cells(pos, start, end)) {
+    return true;
+  }
+
+  if (is_between_cells(pos, end, start)) {
+    return true;
+  }
+
+  return false;
+}
 
 void copy_selection_to_clipboard(Pane *pane) {
   int fd[2];
