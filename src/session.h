@@ -85,8 +85,8 @@ typedef struct Session {
 
 typedef struct Buffer {
   char *buffer;
-  int n;
-  int capacity;
+  uint64_t n;
+  uint64_t capacity;
 } Buffer;
 
 typedef struct Neotmux {

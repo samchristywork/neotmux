@@ -153,6 +153,8 @@ void write_cursor_style() {
 }
 
 void render(int fd, RenderType type) {
+  neotmux->bb.n = 0 + sizeof(uint64_t);
+
   if (type == RENDER_SCREEN) {
     int before = neotmux->bb.n;
     render_screen();
@@ -161,8 +163,7 @@ void render(int fd, RenderType type) {
     int y = currentWindow->height;
     int n = neotmux->bb.n - before;
     float r = (float)n / (x * y);
-    WRITE_LOG(fd, "Render (%dx%d). Writing %d bytes (%f bytes/cell)", x, y, n,
-              r);
+    WRITE_LOG(fd, "Render (%dx%d). Writing %d bytes (%f b/cell)", x, y, n, r);
   } else if (type == RENDER_BAR) {
     render_bar(fd);
   }
@@ -172,6 +173,6 @@ void render(int fd, RenderType type) {
     write_cursor_style();
   }
 
+  memcpy(neotmux->bb.buffer, &neotmux->bb.n, sizeof(uint64_t));
   write(fd, neotmux->bb.buffer, neotmux->bb.n);
-  neotmux->bb.n = 0;
 }

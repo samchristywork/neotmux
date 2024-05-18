@@ -129,14 +129,14 @@ bool handle_input(int socket, char *buf, int read_size) {
       }
     }
 
+    // TODO: Fix this
     if (read_size == 7 && buf[1] == '\033' && buf[2] == '[' && buf[3] == 'M') {
       if (handle_mouse(socket, buf, read_size)) {
         dirty = true;
       }
     } else {
       Pane *p = get_current_pane(neotmux);
-      int fd = p->process->fd;
-      write(fd, buf + 1, read_size - 1);
+      write(p->process->fd, buf + 1, read_size - 1);
     }
   } else if (buf[0] == 'c') { // Command
     run_command(socket, buf, read_size);
@@ -257,7 +257,7 @@ void *handle_client(void *socket_desc) {
     if (dirty && check_timeout(1000000 / 60)) {
       Session *session = get_current_session(neotmux);
       if (session->window_count == 0) {
-        send(socket, "e", 1, 0);
+        send(socket, "", 0, 0);
         WRITE_LOG(socket, "No windows");
         die();
       }

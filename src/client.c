@@ -62,31 +62,36 @@ void reset_mode() {
 }
 
 bool receive_message(int sock) {
-  FD_ZERO(&fds);
-  FD_SET(sock, &fds);
+  // Get size of message
+  char buf[sizeof(uint64_t)];
+  int read_size = recv(sock, buf, sizeof(uint64_t), 0);
+  if (read_size == 0) {
+    puts("Server disconnected");
+    return false;
+  } else if (read_size == -1) {
+    perror("recv failed");
+    return false;
+  }
 
-#define len 80000 // TODO: Tune this value
-  static char server_reply[len];
-  int retval = select(sock + 1, &fds, NULL, NULL, NULL);
-  if (retval == -1) {
-  } else if (retval) {
-    int read_size = recv(sock, server_reply, len, 0);
+  uint64_t n = 0;
+  memcpy(&n, buf, sizeof(uint64_t));
+  n -= sizeof(uint64_t);
+
+  // Get message
+  char server_reply[n];
+  while (n > 0) {
+    read_size = recv(sock, server_reply, n, 0);
     if (read_size == 0) {
-      puts("Server disconnected");
-      return false;
     } else if (read_size == -1) {
       perror("recv failed");
-      return false;
-    } else if (read_size == 1 && strncmp(server_reply, "e", 1) == 0) {
       return false;
     }
     if (rawMode) {
       write(STDOUT_FILENO, server_reply, read_size);
     }
-  } else {
-    puts("Timeout (This should not happen)");
-    return false;
+    n -= read_size;
   }
+
   return true;
 }
 
