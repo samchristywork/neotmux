@@ -18,77 +18,20 @@
 
 extern Neotmux *neotmux;
 
-// TODO: Move to module
-void swap_panes(Window *w, int a, int b) {
-  Pane tmp = w->panes[a];
-  w->panes[a] = w->panes[b];
-  w->panes[b] = tmp;
-}
-
-void handle_command(int socket, char *buf, int read_size) {
-  char cmd[read_size];
-  memcpy(cmd, buf + 1, read_size - 1);
-  cmd[read_size - 1] = '\0';
-
-  WRITE_LOG(socket, "%s", cmd);
-
-  // Initialize the window, session, and pane.
-  if (strcmp(cmd, "Init") == 0) {
-    load_plugins(socket);
-
-    Session *s = add_session(neotmux, "Main");
-    Window *w = add_window(s, "Main");
-
-    if (neotmux->nCommands != 0) {
-      for (int i = 0; i < neotmux->nCommands; i++) {
-        add_pane(w, neotmux->commands[i]);
-      }
-    } else {
-      int initial_panes = 3;
-      lua_getglobal(neotmux->lua, "initial_panes");
-      if (lua_isnumber(neotmux->lua, -1)) {
-        initial_panes = lua_tonumber(neotmux->lua, -1);
-      }
-      lua_pop(neotmux->lua, 1);
-
-      for (int i = 0; i < initial_panes; i++) {
-        add_pane(w, NULL);
-      }
-    }
-    return;
+#define swap_panes(w, a, b)                                                    \
+  {                                                                            \
+    Pane tmp = w->panes[a];                                                    \
+    w->panes[a] = w->panes[b];                                                 \
+    w->panes[b] = tmp;                                                         \
+    w->current_pane = swap;                                                    \
+    calculate_layout(w);                                                       \
   }
 
-  // Create a new window
-  if (strcmp(cmd, "Create") == 0) {
-    Session *session = get_current_session(neotmux);
-    if (session == NULL) {
-      return;
-    }
+void handle_command(int socket, char *buf, int read_size);
 
-    Window *window;
-
-    lua_getglobal(neotmux->lua, "default_title");
-    if (!lua_isstring(neotmux->lua, -1)) {
-      window = add_window(session, "New Window");
-    } else {
-      char *name = (char *)lua_tostring(neotmux->lua, -1);
-      window = add_window(session, name);
-      lua_pop(neotmux->lua, 1);
-    }
-
-    Window *w = get_current_window(neotmux);
-    window->width = w->width;
-    window->height = w->height;
-    add_pane(window, NULL);
-    session->current_window = session->window_count - 1;
-
-    Window *currentWindow = get_current_window(neotmux);
-    calculate_layout(currentWindow);
-
-    // Render the screen
-  } else if (strcmp(cmd, "RenderScreen") == 0) {
-    // TODO: Implement double buffering
-    // TODO: Why do we send 900+ bytes for a single char update?
+bool handle_render_command(int socket, char *cmd) {
+  // Render the screen
+  if (strcmp(cmd, "RenderScreen") == 0) {
     struct timeval start;
     struct timeval end;
     gettimeofday(&start, NULL);
@@ -124,97 +67,40 @@ void handle_command(int socket, char *buf, int read_size) {
   } else if (strcmp(cmd, "RenderBar") == 0) {
     render(socket, RENDER_BAR);
 
-    // Recalculate the layout
-  } else if (strcmp(cmd, "Layout") == 0) {
-    // TODO: Fix
-    // if (session->current_window > 0 &&
-    //    session->current_window < session->window_count) {
-
-    Window *currentWindow = get_current_window(neotmux);
-    calculate_layout(currentWindow);
-    //}
-
-    // Split the current pane
-  } else if (strcmp(cmd, "VSplit") == 0) {
-    Window *w = get_current_window(neotmux);
-    add_pane(w, NULL);
-    calculate_layout(w);
-    w->current_pane = w->pane_count - 1;
-    w->zoom = -1;
-
     // Re-render the current window
   } else if (strcmp(cmd, "ReRender") == 0) {
     Window *currentWindow = get_current_window(neotmux);
     currentWindow->rerender = true;
+  } else {
+    return false;
+  }
+  return true;
+}
 
-    // Split the current pane
-  } else if (strcmp(cmd, "Split") == 0) {
-    Window *w = get_current_window(neotmux);
-    add_pane(w, NULL);
-    calculate_layout(w);
-    w->current_pane = w->pane_count - 1;
-    w->zoom = -1;
-
-    // Cycle the status bar
-  } else if (strcmp(cmd, "CycleStatus") == 0) {
-    neotmux->statusBarIdx++;
-    render(socket, RENDER_BAR);
-
-    // List all the sessions
-  } else if (strcmp(cmd, "List") == 0) {
-    print_sessions(neotmux, socket);
-
-    // Switch to the next session
-  } else if (strcmp(cmd, "Next") == 0) {
-    Session *session = get_current_session(neotmux);
-    session->current_window++;
-    if (session->current_window >= session->window_count) {
-      session->current_window = 0;
-    }
-    Window *currentWindow = get_current_window(neotmux);
-    calculate_layout(currentWindow);
-
-    // Switch to the previous session
-  } else if (strcmp(cmd, "Prev") == 0) {
-    Session *session = get_current_session(neotmux);
-    session->current_window--;
-    if (session->current_window < 0) {
-      session->current_window = session->window_count - 1;
-    }
-    Window *currentWindow = get_current_window(neotmux);
-    calculate_layout(currentWindow);
-
-    // Swap the current pane with the pane to the left
-  } else if (strcmp(cmd, "SwapLeft") == 0) {
+bool handle_directional_command(char *cmd) {
+  // Swap the current pane with the pane to the left
+  if (strcmp(cmd, "SwapLeft") == 0) {
     Window *w = get_current_window(neotmux);
     int swap = move_active_pane(LEFT, w);
     swap_panes(w, w->current_pane, swap);
-    w->current_pane = swap;
-    calculate_layout(w);
 
     // Swap the current pane with the pane to the right
   } else if (strcmp(cmd, "SwapRight") == 0) {
     Window *w = get_current_window(neotmux);
     int swap = move_active_pane(RIGHT, w);
     swap_panes(w, w->current_pane, swap);
-    w->current_pane = swap;
-    calculate_layout(w);
 
     // Swap the current pane with the pane above
   } else if (strcmp(cmd, "SwapUp") == 0) {
     Window *w = get_current_window(neotmux);
     int swap = move_active_pane(UP, w);
     swap_panes(w, w->current_pane, swap);
-    w->current_pane = swap;
-    calculate_layout(w);
 
     // Swap the current pane with the pane below
   } else if (strcmp(cmd, "SwapDown") == 0) {
     Window *w = get_current_window(neotmux);
     int swap = move_active_pane(DOWN, w);
     swap_panes(w, w->current_pane, swap);
-    w->current_pane = swap;
-    calculate_layout(w);
 
     // Move the current pane to the left
   } else if (strcmp(cmd, "Left") == 0) {
@@ -235,9 +121,15 @@ void handle_command(int socket, char *buf, int read_size) {
   } else if (strcmp(cmd, "Down") == 0) {
     Window *w = get_current_window(neotmux);
     w->current_pane = move_active_pane(DOWN, w);
+  } else {
+    return false;
+  }
+  return true;
+}
 
-    // Change the layout to even horizontal
-  } else if (strcmp(cmd, "Even_Horizontal") == 0) {
+bool handle_layout_command(char *cmd) {
+  // Change the layout to even horizontal
+  if (strcmp(cmd, "Even_Horizontal") == 0) {
     Window *w = get_current_window(neotmux);
     w->layout = LAYOUT_EVEN_HORIZONTAL;
     calculate_layout(w);
@@ -272,6 +164,168 @@ void handle_command(int socket, char *buf, int read_size) {
     w->layout = LAYOUT_CUSTOM;
     calculate_layout(w);
 
+    // Recalculate the layout
+  } else if (strcmp(cmd, "Layout") == 0) {
+    // TODO: Fix
+    // if (session->current_window > 0 &&
+    //    session->current_window < session->window_count) {
+
+    Window *currentWindow = get_current_window(neotmux);
+    calculate_layout(currentWindow);
+    //}
+  } else {
+    return false;
+  }
+  return true;
+}
+
+bool handle_debug_command(int socket, char *cmd) {
+  // List all the sessions
+  if (strcmp(cmd, "List") == 0) {
+    print_sessions(neotmux, socket);
+
+    // Print "Log" (used for debugging)
+  } else if (strcmp(cmd, "Log") == 0) {
+    printf("Log\n");
+
+  } else {
+    return false;
+  }
+  return true;
+}
+
+bool handle_control_command(int socket, char *cmd) {
+  // Initialize the window, session, and pane.
+  if (strcmp(cmd, "Init") == 0) {
+    load_plugins(socket);
+
+    Session *s = add_session(neotmux, "Main");
+    Window *w = add_window(s, "Main");
+
+    if (neotmux->nCommands != 0) {
+      for (int i = 0; i < neotmux->nCommands; i++) {
+        add_pane(w, neotmux->commands[i]);
+      }
+    } else {
+      int initial_panes = 3;
+      lua_getglobal(neotmux->lua, "initial_panes");
+      if (lua_isnumber(neotmux->lua, -1)) {
+        initial_panes = lua_tonumber(neotmux->lua, -1);
+      }
+      lua_pop(neotmux->lua, 1);
+
+      for (int i = 0; i < initial_panes; i++) {
+        add_pane(w, NULL);
+      }
+    }
+
+    // Reload the Lua plugins
+  } else if (strcmp(cmd, "ReloadLua") == 0) {
+    load_plugins(socket);
+
+    // Quit the program
+  } else if (strcmp(cmd, "Quit") == 0) {
+    close(socket);
+    exit(0);
+  } else {
+    return false;
+  }
+  return true;
+}
+
+bool handle_mode_command(int socket, char *cmd) {
+  // Tell the server that the client is in Normal mode
+  if (strcmp(cmd, "ModeNormal") == 0) {
+    neotmux->mode = MODE_NORMAL;
+    handle_command(socket, "RenderBar", 9);
+
+    // Tell the server that the client is in Control mode
+  } else if (strcmp(cmd, "ModeControl") == 0) {
+    neotmux->mode = MODE_CONTROL;
+    handle_command(socket, "RenderBar", 9);
+
+    // Tell the server that the client is in Sticky Control mode
+  } else if (strcmp(cmd, "ModeControlSticky") == 0) {
+    neotmux->mode = MODE_CONTROL_STICKY;
+    handle_command(socket, "RenderBar", 9);
+  } else {
+    return false;
+  }
+  return true;
+}
+
+bool handle_misc_command(int socket, char *cmd) {
+  // Create a new window
+  if (strcmp(cmd, "Create") == 0) {
+    Session *session = get_current_session(neotmux);
+    if (session != NULL) {
+      Window *window;
+
+      lua_getglobal(neotmux->lua, "default_title");
+      if (!lua_isstring(neotmux->lua, -1)) {
+        window = add_window(session, "New Window");
+      } else {
+        char *name = (char *)lua_tostring(neotmux->lua, -1);
+        window = add_window(session, name);
+        lua_pop(neotmux->lua, 1);
+      }
+
+      Window *w = get_current_window(neotmux);
+      window->width = w->width;
+      window->height = w->height;
+      add_pane(window, NULL);
+      session->current_window = session->window_count - 1;
+
+      Window *currentWindow = get_current_window(neotmux);
+      calculate_layout(currentWindow);
+    }
+
+    // Split the current pane
+  } else if (strcmp(cmd, "VSplit") == 0) {
+    Window *w = get_current_window(neotmux);
+    add_pane(w, NULL);
+    calculate_layout(w);
+    w->current_pane = w->pane_count - 1;
+    w->zoom = -1;
+
+    // Split the current pane
+  } else if (strcmp(cmd, "Split") == 0) {
+    Window *w = get_current_window(neotmux);
+    add_pane(w, NULL);
+    calculate_layout(w);
+    w->current_pane = w->pane_count - 1;
+    w->zoom = -1;
+
+    // Cycle the status bar
+  } else if (strcmp(cmd, "CycleStatus") == 0) {
+    neotmux->statusBarIdx++;
+    handle_command(socket, "RenderBar", 9);
+
+    // Select the status bar
+  } else if (memcmp(cmd, "SelectStatus", 12) == 0) {
+    neotmux->statusBarIdx = atoi(cmd + 13);
+    handle_command(socket, "RenderBar", 9);
+
+    // Switch to the next session
+  } else if (strcmp(cmd, "Next") == 0) {
+    Session *session = get_current_session(neotmux);
+    session->current_window++;
+    if (session->current_window >= session->window_count) {
+      session->current_window = 0;
+    }
+    Window *currentWindow = get_current_window(neotmux);
+    calculate_layout(currentWindow);
+
+    // Switch to the previous session
+  } else if (strcmp(cmd, "Prev") == 0) {
+    Session *session = get_current_session(neotmux);
+    session->current_window--;
+    if (session->current_window < 0) {
+      session->current_window = session->window_count - 1;
+    }
+    Window *currentWindow = get_current_window(neotmux);
+    calculate_layout(currentWindow);
+
     // Zoom the current pane
   } else if (strcmp(cmd, "Zoom") == 0) {
     // TODO: Fix the issue where mouse events are not being sent to the zoomed
@@ -283,10 +337,6 @@ void handle_command(int socket, char *buf, int read_size) {
       w->zoom = -1;
     }
     calculate_layout(w);
-
-    // Print "Log" (used for debugging)
-  } else if (strcmp(cmd, "Log") == 0) {
-    printf("Log\n");
 
     // Scroll the current pane upwards
   } else if (strcmp(cmd, "ScrollUp") == 0) {
@@ -305,21 +355,19 @@ void handle_command(int socket, char *buf, int read_size) {
     // Create a new window with a specified name
   } else if (memcmp(cmd, "CreateNamed", 11) == 0) {
     Session *session = get_current_session(neotmux);
-    if (session == NULL) {
-      return;
+    if (session != NULL) {
+      char *title = strdup(cmd + 12);
+      Window *window = add_window(session, title);
+
+      Window *w = get_current_window(neotmux);
+      window->width = w->width;
+      window->height = w->height;
+      add_pane(window, NULL);
+      session->current_window = session->window_count - 1;
+
+      Window *currentWindow = get_current_window(neotmux);
+      calculate_layout(currentWindow);
     }
-
-    char *title = strdup(cmd + 12);
-    Window *window = add_window(session, title);
-
-    Window *w = get_current_window(neotmux);
-    window->width = w->width;
-    window->height = w->height;
-    add_pane(window, NULL);
-    session->current_window = session->window_count - 1;
-
-    Window *currentWindow = get_current_window(neotmux);
-    calculate_layout(currentWindow);
 
     // Rename the current window
   } else if (memcmp(cmd, "RenameWindow", 12) == 0) {
@@ -335,36 +383,40 @@ void handle_command(int socket, char *buf, int read_size) {
     char *title = strdup(cmd + 14);
     session->title = title;
 
-    // Tell the server that the client is in Normal mode
-  } else if (strcmp(cmd, "ModeNormal") == 0) {
-    neotmux->mode = MODE_NORMAL;
-    render(socket, RENDER_BAR);
-
-    // Tell the server that the client is in Control mode
-  } else if (strcmp(cmd, "ModeControl") == 0) {
-    neotmux->mode = MODE_CONTROL;
-    render(socket, RENDER_BAR);
-
-    // Tell the server that the client is in Sticky Control mode
-  } else if (strcmp(cmd, "ModeControlSticky") == 0) {
-    neotmux->mode = MODE_CONTROL_STICKY;
-    render(socket, RENDER_BAR);
-
-    // Reload the Lua plugins
-  } else if (strcmp(cmd, "ReloadLua") == 0) {
-    load_plugins(socket);
-
     // Copy the current selection to the clipboard
   } else if (strcmp(cmd, "CopySelection") == 0) {
     Pane *pane = get_current_pane(neotmux);
     copy_selection_to_clipboard(pane);
     pane->selection.active = false;
-
-    // Quit the program
-  } else if (strcmp(cmd, "Quit") == 0) {
-    close(socket);
-    exit(0);
   } else {
-    WRITE_LOG(socket, "Unhandled command: %s\n", cmd);
+    return false;
+  }
+  return true;
+}
+
+void handle_command(int socket, char *buf, int read_size) {
+  char cmd[read_size];
+  memcpy(cmd, buf + 1, read_size - 1);
+  cmd[read_size - 1] = '\0';
+
+  WRITE_LOG(socket, "%s", cmd);
+
+  if (handle_render_command(socket, cmd)) {
+    return;
+  } else if (handle_directional_command(cmd)) {
+    return;
+  } else if (handle_layout_command(cmd)) {
+    return;
+  } else if (handle_debug_command(socket, cmd)) {
+    return;
+  } else if (handle_control_command(socket, cmd)) {
+    return;
+  } else if (handle_mode_command(socket, cmd)) {
+    return;
+    // TODO: Categorize misc commands
+  } else if (handle_misc_command(socket, cmd)) {
+    return;
+  } else {
+    WRITE_LOG(socket, "Unhandled command: %s", cmd);
   }
 }
