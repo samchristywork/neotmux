@@ -142,6 +142,17 @@ void handle_rename(int sock, char *prompt, char *default_name, char *command) {
   write_string(sock, "cRenderBar");
 }
 
+int lua_write_string(lua_State *L) {
+  int sock = lua_tointeger(L, 1);
+  const char *str = lua_tostring(L, 2);
+  write_string(sock, (char *)str);
+  return 0;
+}
+
+void register_functions(lua_State *L) {
+  lua_register(L, "write_string", lua_write_string);
+}
+
 lua_State *L = NULL;
 bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
   if (!L) {
@@ -150,6 +161,7 @@ bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
     if (stat(filename, &buffer) == 0) {
       L = luaL_newstate();
       luaL_openlibs(L);
+      register_functions(L);
       luaL_dofile(L, filename);
     }
   }
@@ -165,18 +177,20 @@ bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
       return false;
     }
 
+    lua_pushinteger(L, sock);
+
     char cmd[numRead + 1];
     memcpy(cmd, buf + 1, numRead);
     cmd[numRead] = '\0';
     lua_pushstring(L, cmd);
-    lua_call(L, 1, 1);
-    if (lua_isstring(L, -1)) {
-      const char *command = lua_tostring(L, -1);
-      write_string(sock, (char *)command);
+    lua_call(L, 2, 1);
+    if (lua_isboolean(L, -1)) {
+      bool ret = lua_toboolean(L, -1);
       lua_pop(L, 1);
-      return true;
+      if (ret) {
+        return true;
+      }
     }
-    lua_pop(L, 1);
   } else if (mode == MODE_NORMAL) {
     lua_getglobal(L, "handle_binding_normal");
     if (!lua_isfunction(L, -1)) {
@@ -184,18 +198,20 @@ bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
       return false;
     }
 
+    lua_pushinteger(L, sock);
+
     char cmd[numRead + 1];
     memcpy(cmd, buf + 1, numRead);
     cmd[numRead] = '\0';
     lua_pushstring(L, cmd);
-    lua_call(L, 1, 1);
-    if (lua_isstring(L, -1)) {
-      const char *command = lua_tostring(L, -1);
-      write_string(sock, (char *)command);
+    lua_call(L, 2, 1);
+    if (lua_isboolean(L, -1)) {
+      bool ret = lua_toboolean(L, -1);
       lua_pop(L, 1);
-      return true;
+      if (ret) {
+        return true;
+      }
     }
-    lua_pop(L, 1);
   }
 
   return false;
