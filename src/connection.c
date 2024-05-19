@@ -21,7 +21,7 @@ int accept_connection(int socket_desc, struct sockaddr_in client) {
 
 void wait_for_connection(int socket_desc) {
   listen(socket_desc, 3);
-  WRITE_LOG(socket_desc, "Waiting for incoming connections");
+  WRITE_LOG(LOG_INFO, socket_desc, "Waiting for incoming connections");
 }
 
 int *init_connection(int socket_desc) {

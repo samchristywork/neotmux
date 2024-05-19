@@ -9,6 +9,7 @@
 
 #include "args.h"
 #include "client.h"
+#include "log.h"
 #include "server.h"
 
 #define VERSION_STRING "neotmux-1.0.0"
@@ -20,6 +21,8 @@
   "\n"                                                                         \
   "This is free software; you are free to change and redistribute it.\n"       \
   "There is NO WARRANTY, to the extent permitted by law."
+
+extern LOG_TYPE log_level;
 
 int init_client(char *name) {
   mkdir("/tmp/ntmux-1000", 0777);
@@ -147,6 +150,7 @@ int main(int argc, char *argv[]) {
     int sock = init_client(name);
     return start_client(sock);
   } else if (!client_mode && server_mode) {
+    // TODO: Check if server is already running
     int sock = init_server(name);
     return start_server(sock, name, log_filename, commands, nCommands);
   } else if (!client_mode && !server_mode) {

@@ -163,7 +163,8 @@ void render(int fd, RenderType type) {
     int y = currentWindow->height;
     int n = neotmux->bb.n - before;
     float r = (float)n / (x * y);
-    WRITE_LOG(fd, "Render (%dx%d). Writing %d bytes (%f b/cell)", x, y, n, r);
+    WRITE_LOG(LOG_PERF, fd, "Render (%dx%d). Writing %d bytes (%f bytes/cell)",
+              x, y, n, r);
   } else if (type == RENDER_BAR) {
     render_bar(fd);
   }

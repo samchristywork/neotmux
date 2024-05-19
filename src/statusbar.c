@@ -14,7 +14,7 @@ char *call_statusbar_function(int socket, int cols, lua_State *lua,
                               int windowCount, Window *currentWindow) {
   lua_getglobal(lua, "statusbar");
   if (!lua_isfunction(lua, -1)) {
-    WRITE_LOG(socket, "statusbar is not a function");
+    WRITE_LOG(LOG_WARN, socket, "statusbar is not a function");
     lua_pop(lua, 1);
     return NULL;
   }

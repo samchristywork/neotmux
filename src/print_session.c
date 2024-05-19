@@ -134,7 +134,7 @@ void print_session(Session *session) {
 }
 
 void print_sessions(Neotmux *neotmux, int socket) {
-  WRITE_LOG(socket, "Printing Sessions");
+  WRITE_LOG(LOG_INFO, socket, "Printing Sessions");
 
   int count = neotmux->session_count;
   Session *sessions = neotmux->sessions;

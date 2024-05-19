@@ -43,7 +43,7 @@ ssize_t read_message(int sock, char *buf, size_t len) {
 int die_socket_desc = -1;
 #define die()                                                                  \
   close(die_socket_desc);                                                      \
-  WRITE_LOG(socket, "Exiting...");                                             \
+  WRITE_LOG(LOG_INFO, socket, "Exiting...");                                   \
   exit(EXIT_SUCCESS);
 
 void reorder_windows() {
@@ -104,17 +104,17 @@ void reorder_panes(int socket, Window *w) {
 // All possible inputs should have an associated message
 bool handle_input(int socket, char *buf, int read_size) {
   if (read_size == 0) { // Client disconnected
-    WRITE_LOG(socket, "Client disconnected");
+    WRITE_LOG(LOG_INFO, socket, "Client disconnected");
     return false;
   } else if (read_size == -1) { // Error
-    WRITE_LOG(socket, "Error reading from client");
+    WRITE_LOG(LOG_INFO, socket, "Error reading from client");
     return false;
   } else if (buf[0] == 's') { // Size
     uint32_t width;
     uint32_t height;
     memcpy(&width, buf + 1, sizeof(uint32_t));
     memcpy(&height, buf + 5, sizeof(uint32_t));
-    WRITE_LOG(socket, "Size %dx%d", width, height);
+    WRITE_LOG(LOG_INFO, socket, "Size %dx%d", width, height);
     Window *window = get_current_window(neotmux);
     window->width = width;
     window->height = height;
@@ -123,9 +123,9 @@ bool handle_input(int socket, char *buf, int read_size) {
   } else if (buf[0] == 'e') { // Event
     for (int i = 1; i < read_size; i++) {
       if (isprint(buf[i])) {
-        WRITE_LOG(socket, "Event (%d, %c)", buf[i], buf[i]);
+        WRITE_LOG(LOG_EVENT, socket, "Event (%d, %c)", buf[i], buf[i]);
       } else {
-        WRITE_LOG(socket, "Event (%d)", buf[i]);
+        WRITE_LOG(LOG_EVENT, socket, "Event (%d)", buf[i]);
       }
     }
 
@@ -142,12 +142,13 @@ bool handle_input(int socket, char *buf, int read_size) {
     run_command(socket, buf, read_size);
     dirty = true;
   } else {
-    WRITE_LOG(socket, "Unhandled input");
+    WRITE_LOG(LOG_WARN, socket, "Unhandled input");
   }
 
   return true;
 }
 
+// TODO: Investigate this
 bool check_timeout(int timeout) {
   static struct timeval tv = {.tv_sec = 0, .tv_usec = 0};
 
@@ -176,7 +177,7 @@ void *handle_client(void *socket_desc) {
   int socket = *(int *)socket_desc;
   int frame = 0;
 
-  WRITE_LOG(socket, "Client connected");
+  WRITE_LOG(LOG_INFO, socket, "Client connected");
 
   handle_input(socket, "cInit", 5);
 
@@ -231,11 +232,12 @@ void *handle_client(void *socket_desc) {
           static char buf[32000];
           int read_size = read(p->process->fd, buf, 32000);
           if (read_size == 0) {
-            WRITE_LOG(socket, "Process disconnected (%d)", p->process->fd);
+            WRITE_LOG(LOG_INFO, socket, "Process disconnected (%d)",
+                      p->process->fd);
             exit(EXIT_FAILURE);
           } else if (read_size == -1) {
             p->process->closed = true;
-            WRITE_LOG(socket, "Process closed (%d)", p->process->fd);
+            WRITE_LOG(LOG_INFO, socket, "Process closed (%d)", p->process->fd);
             reorder_panes(socket, w);
             continue;
           }
@@ -258,7 +260,7 @@ void *handle_client(void *socket_desc) {
       Session *session = get_current_session(neotmux);
       if (session->window_count == 0) {
         send(socket, "", 0, 0);
-        WRITE_LOG(socket, "No windows");
+        WRITE_LOG(LOG_INFO, socket, "No windows");
         die();
       }
       run_command(socket, "cRenderScreen", 13);

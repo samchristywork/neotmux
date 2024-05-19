@@ -42,7 +42,7 @@ bool load_plugins(int socket) {
   luaL_dostring(neotmux->lua, s);
 
   {
-    WRITE_LOG(socket, "Loading plugins");
+    WRITE_LOG(LOG_INFO, socket, "Loading plugins");
     char *home = getenv("HOME");
     char plugins[PATH_MAX];
     snprintf(plugins, PATH_MAX, "%s/.ntmux/plugins", home);
@@ -52,7 +52,7 @@ bool load_plugins(int socket) {
       struct dirent *entry;
       while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_DIR && entry->d_name[0] != '.') {
-          WRITE_LOG(socket, "Loading plugin: %s", entry->d_name);
+          WRITE_LOG(LOG_INFO, socket, "Loading plugin: %s", entry->d_name);
           size_t size = strlen(plugins) + strlen(entry->d_name) + 11;
           if (size > PATH_MAX) {
             fprintf(stderr, "Path too long\n");

@@ -59,10 +59,11 @@ bool handle_render_command(int socket, char *cmd) {
     renderTime = (end.tv_sec - start.tv_sec) * 1000.0;
     renderTime += (end.tv_usec - start.tv_usec) / 1000.0;
 
-    WRITE_LOG(socket, "Render took %f ms", renderTime);
-    WRITE_LOG(socket, "Renders: %d", renderCount);
-    WRITE_LOG(socket, "Seconds: %f", elapsedTime);
-    WRITE_LOG(socket, "Renders/Sec: %f", (float)renderCount / elapsedTime);
+    WRITE_LOG(LOG_PERF, socket, "Render took %f ms", renderTime);
+    WRITE_LOG(LOG_PERF, socket, "Renders: %d", renderCount);
+    WRITE_LOG(LOG_PERF, socket, "Seconds: %f", elapsedTime);
+    WRITE_LOG(LOG_PERF, socket, "Renders/Sec: %f",
+              (float)renderCount / elapsedTime);
 
     // Render the status bar
   } else if (strcmp(cmd, "RenderBar") == 0) {
@@ -413,7 +414,7 @@ void handle_command(int socket, char *buf, int read_size) {
   memcpy(cmd, buf + 1, read_size - 1);
   cmd[read_size - 1] = '\0';
 
-  WRITE_LOG(socket, "%s", cmd);
+  WRITE_LOG(LOG_EVENT, socket, "%s", cmd);
 
   if (handle_render_command(socket, cmd)) {
     return;
@@ -433,6 +434,6 @@ void handle_command(int socket, char *buf, int read_size) {
   } else if (handle_misc_command(socket, cmd)) {
     return;
   } else {
-    WRITE_LOG(socket, "Unhandled command: %s", cmd);
+    WRITE_LOG(LOG_WARN, socket, "Unhandled command: %s", cmd);
   }
 }
