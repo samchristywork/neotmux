@@ -410,6 +410,14 @@ bool handle_misc_command(int socket, char *cmd) {
 }
 
 void handle_command(int socket, char *buf, int read_size) {
+  if (buf[0] != 'c') {
+    char cmd[read_size + 1];
+    memcpy(cmd, buf, read_size);
+    cmd[read_size] = '\0';
+    WRITE_LOG(LOG_WARN, socket, "Invalid command: %s", cmd);
+    return;
+  }
+
   char cmd[read_size];
   memcpy(cmd, buf + 1, read_size - 1);
   cmd[read_size - 1] = '\0';

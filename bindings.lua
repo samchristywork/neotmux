@@ -3,7 +3,27 @@ local bindings = {
   ["normal"] = {}
 }
 
--- TODO: Should throw error on syntax error
+function print_unused_bindings(bindings)
+  print("No control bindings for:")
+  for i = 0, 25 do
+    if bindings["control"][string.char(i + 97)] == nil then
+      io.write(string.char(i + 97))
+    end
+  end
+
+  print()
+  print()
+
+  print("No normal bindings for:")
+  for i = 0, 25 do
+    if bindings["normal"][string.char(i + 97)] == nil then
+      io.write(string.char(i + 97))
+    end
+  end
+
+  print()
+end
+
 function handle_binding_normal(sock, buf)
   for key, value in pairs(bindings["normal"]) do
     if (buf == key) then
@@ -42,16 +62,16 @@ bindings["normal"]["\x1bp"] = "cPrev"
 bindings["normal"]["\x1bz"] = "cZoom"
 
 -- Directional
-bindings["control"]["\x1b[D"] = "cLeft"
-bindings["control"]["\x1b[C"] = "cRight"
 bindings["control"]["\x1b[A"] = "cUp"
 bindings["control"]["\x1b[B"] = "cDown"
+bindings["control"]["\x1b[C"] = "cRight"
+bindings["control"]["\x1b[D"] = "cLeft"
 
 -- Splits
-bindings["control"]["\x1b|"] = "cSplit"
-bindings["control"]["\x1b_"] = "cVSplit"
-bindings["control"]["\x1b\""] = "cSplit"
-bindings["control"]["\x1b%"] = "cVSplit"
+bindings["control"]["|"] = "cSplit"
+bindings["control"]["_"] = "cVSplit"
+bindings["control"]["\""] = "cSplit"
+bindings["control"]["%"] = "cVSplit"
 
 -- Layout
 bindings["control"]["1"] = "cEven_Horizontal"
@@ -73,11 +93,15 @@ bindings["control"]["n"] = "cNext"
 bindings["control"]["p"] = "cPrev"
 
 -- Misc.
+bindings["control"]["\x01"] = "e\x01" -- Ctrl + A
+bindings["control"]["\x02"] = "els\n"
 bindings["control"]["i"] = "cList"
-bindings["control"]["y"] = "cCycleStatus"
-bindings["control"]["r"] = "cReloadLua"
-bindings["control"]["z"] = "cZoom"
 bindings["control"]["q"] = "cQuit"
-bindings["control"]["y"] = "cCopySelection"
+bindings["control"]["r"] = "cReloadLua"
+bindings["control"]["x"] = "cCopySelection"
+bindings["control"]["y"] = "cCycleStatus"
+bindings["control"]["z"] = "cZoom"
 
 -- TODO: Page Up and Page Down
+
+print_unused_bindings(bindings)
