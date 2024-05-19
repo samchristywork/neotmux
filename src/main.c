@@ -39,6 +39,7 @@ int init_client(char *name) {
   }
 
   printf("Connecting\n");
+  int i = 0;
   while (1) {
     const useconds_t one_second = 1000000;
     usleep(one_second / 10);
@@ -48,6 +49,13 @@ int init_client(char *name) {
       printf("Connected\n");
       break;
     }
+
+    if (i == 10) {
+      fprintf(stderr, "Could not connect to server\n");
+      close(sock);
+      exit(EXIT_FAILURE);
+    }
+    i++;
   }
 
   return sock;
@@ -108,6 +116,7 @@ int main(int argc, char *argv[]) {
   add_arg('s', "server", "Run Ntmux in server mode", ARG_NONE);
   add_arg('u', "unix", "Use UNIX sockets (default)", ARG_NONE);
   add_arg('v', "version", "Show the version number and license info", ARG_NONE);
+  add_arg('d', "debug", "Log level (default INFO)", ARG_REQUIRED);
 
   bool help = get_arg_bool(argc, argv, 'h', false);
   bool version = get_arg_bool(argc, argv, 'v', false);
@@ -117,7 +126,24 @@ int main(int argc, char *argv[]) {
   bool use_unix = get_arg_bool(argc, argv, 'u', true);
   char *name = get_arg_string(argc, argv, 'n', "local");
   char *log_filename = get_arg_string(argc, argv, 'l', "ntmux.log");
+  char *log_level_string = get_arg_string(argc, argv, 'd', "INFO");
   // int port = get_arg_int(argc, argv, 'p', 5097);
+
+  if (strcmp(log_level_string, "PERF") == 0) {
+    log_level = LOG_PERF;
+  } else if (strcmp(log_level_string, "EVENT") == 0) {
+    log_level = LOG_EVENT;
+  } else if (strcmp(log_level_string, "INFO") == 0) {
+    log_level = LOG_INFO;
+  } else if (strcmp(log_level_string, "WARN") == 0) {
+    log_level = LOG_WARN;
+  } else if (strcmp(log_level_string, "ERROR") == 0) {
+    log_level = LOG_ERROR;
+  } else {
+    fprintf(stderr, "Invalid log level\n\n");
+    usage(argv[0]);
+    return EXIT_FAILURE;
+  }
 
   int nCommands = 0;
   char **commands = get_arg_strings(argc, argv, 'e', &nCommands);
