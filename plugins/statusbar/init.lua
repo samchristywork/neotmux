@@ -19,34 +19,35 @@ function statusbar_left(sessionName, windowTitles, mode)
     end
   end
 
-  return left
+  return left, #left
 end
 
-frame = 0
-numBars = 3
-function statusbar_right(idx, numBars)
-  frame = frame + 1
-  idx = idx % numBars
-  if idx == 0 then
-    hostname = system("hostname")
-    hostname = hostname:gsub("\n", "")
-    date = os.date("%H:%M %d-%b-%Y")
-    resetColor = "\x1b[38;5;4m"
 
-    ret = resetColor .. ' "' .. hostname .. '" ' .. date
-    return ret, #hostname + #date + 4
-  elseif idx == 1 then
-    ret = "" .. "Implement your own bar here"
-    return ret, #ret
-  else
-    ret = "" .. frame
-    return ret, #ret
-  end
+function default_bar(sessionName, windowTitles, mode)
+  hostname = system("hostname"):gsub("\n", "")
+  date = os.date("%H:%M %d-%b-%Y")
+  ret = ' "' .. hostname .. '" ' .. date
+
+  return ret, #ret
+end
+
+local frame = 0;
+function frame_bar(sessionName, windowTitles, mode)
+  ret = "" .. frame
+  frame = frame + 1
+  return ret, #ret
 end
 
 function statusbar(idx, cols, sessionName, windowTitles, mode)
-  left = statusbar_left(sessionName, windowTitles, mode)
-  right, width = statusbar_right(idx, numBars)
-  padding = string.rep(" ", cols - #left - width)
+  local bars = {
+    {statusbar_left, default_bar},
+    {statusbar_left, frame_bar},
+  }
+
+  local idx = idx % #bars + 1
+  local left, lWidth = bars[idx][1](sessionName, windowTitles, mode)
+  local right, rWidth = bars[idx][2](sessionName, windowTitles, mode)
+  padding = string.rep(" ", cols - lWidth - rWidth)
+
   return left .. padding .. right
 end
