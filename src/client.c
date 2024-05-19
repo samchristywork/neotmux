@@ -1,18 +1,13 @@
-#include <arpa/inet.h>
 #include <lua5.4/lauxlib.h>
-#include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
 #include <pthread.h>
 #include <readline/readline.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/un.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -84,7 +79,9 @@ bool receive_message(int sock) {
   char server_reply[n];
   while (n > 0) {
     read_size = recv(sock, server_reply, n, 0);
-    if (read_size == 0) {
+    if (read_size == 0 && n > 0) {
+      puts("Server disconnected");
+      return false;
     } else if (read_size == -1) {
       perror("recv failed");
       return false;
@@ -313,10 +310,12 @@ void *handle_events(void *socket_desc) {
         write_string(sock, "cLog");
       }
 
+      // TODO: Move to Lua
       if (n == 1 && buf[1] == 'n') {
         send_size(sock);
       }
 
+      // TODO: Move to Lua
       if (n == 1 && buf[1] == 'p') {
         send_size(sock);
       }
