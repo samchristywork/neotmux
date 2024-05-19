@@ -244,17 +244,17 @@ bool handle_mode_command(int socket, char *cmd) {
   // Tell the server that the client is in Normal mode
   if (strcmp(cmd, "ModeNormal") == 0) {
     neotmux->mode = MODE_NORMAL;
-    handle_command(socket, "RenderBar", 9);
+    handle_command(socket, "cRenderBar", 10);
 
     // Tell the server that the client is in Control mode
   } else if (strcmp(cmd, "ModeControl") == 0) {
     neotmux->mode = MODE_CONTROL;
-    handle_command(socket, "RenderBar", 9);
+    handle_command(socket, "cRenderBar", 10);
 
     // Tell the server that the client is in Sticky Control mode
   } else if (strcmp(cmd, "ModeControlSticky") == 0) {
     neotmux->mode = MODE_CONTROL_STICKY;
-    handle_command(socket, "RenderBar", 9);
+    handle_command(socket, "cRenderBar", 10);
   } else {
     return false;
   }
@@ -345,12 +345,12 @@ bool handle_misc_command(int socket, char *cmd) {
   // Cycle the status bar
   if (strcmp(cmd, "CycleStatus") == 0) {
     neotmux->statusBarIdx++;
-    handle_command(socket, "RenderBar", 9);
+    handle_command(socket, "cRenderBar", 10);
 
     // Select the status bar
   } else if (memcmp(cmd, "SelectStatus", 12) == 0) {
     neotmux->statusBarIdx = atoi(cmd + 13);
-    handle_command(socket, "RenderBar", 9);
+    handle_command(socket, "cRenderBar", 10);
 
     // Switch to the next session
   } else if (strcmp(cmd, "Next") == 0) {
