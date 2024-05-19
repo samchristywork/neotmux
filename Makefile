@@ -17,8 +17,7 @@ build/%.o: src/%.c src/*.h
 	${CC} ${CFLAGS} -c $< -o $@ ${LIBS}
 
 simple:
-	@mkdir -p build
-	${CC} ${CFLAGS} src/*.c -o build/ntmux ${LIBS}
+	gcc src/*.c -o ntmux -llua5.4 -lvterm -lreadline
 
 run: build/ntmux
 	unset NTMUX && ${TERMINAL} -e build/ntmux -n test
