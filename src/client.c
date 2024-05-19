@@ -161,17 +161,6 @@ void register_functions(lua_State *L) {
 lua_State *L = NULL;
 bool handle_lua_binding(int numRead, char *buf, int sock, Mode mode) {
   if (!L) {
-    char *filename = "bindings.lua";
-    struct stat buffer;
-    if (stat(filename, &buffer) == 0) {
-      L = luaL_newstate();
-      luaL_openlibs(L);
-      register_functions(L);
-      luaL_dofile(L, filename);
-    }
-  }
-
-  if (!L) {
     return false;
   }
 
@@ -373,6 +362,15 @@ void handle_sigint(int sig) {
 }
 
 int start_client(int sock) {
+  char *filename = "bindings.lua";
+  struct stat buffer;
+  if (stat(filename, &buffer) == 0) {
+    L = luaL_newstate();
+    luaL_openlibs(L);
+    register_functions(L);
+    luaL_dofile(L, filename);
+  }
+
   signal(SIGINT, handle_sigint);
 
   write(STDOUT_FILENO, "\033[?1049h", 8); // Alternate screen
