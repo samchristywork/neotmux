@@ -47,6 +47,7 @@ void disable_mouse_tracking() {
 // TODO: This is a hack
 bool rawMode = false;
 void enter_raw_mode() {
+  printf("\033[?1049h"); // Alternate screen
   tcgetattr(STDIN_FILENO, &term);
   term.c_lflag &= ~(ICANON | ECHO);
   tcsetattr(STDIN_FILENO, TCSANOW, &term);
@@ -59,6 +60,8 @@ void reset_mode() {
   term.c_lflag |= ICANON | ECHO;
   tcsetattr(STDIN_FILENO, TCSANOW, &term);
   rawMode = false;
+  printf("\033[?1049l"); // Normal screen
+  printf("\033[2J");     // Clear screen
 }
 
 bool receive_message(int sock) {
@@ -276,29 +279,36 @@ void *handle_events(void *socket_desc) {
 
       if (n == 1 && buf[1] == 'o') {
         reset_mode();
-        printf("\033[?1049l"); // Normal screen
-        printf("\033[2J");     // Clear screen
         char *ret = execute_command("./scripts/list_commands.sh");
         write_string(sock, ret);
         free(ret);
-        printf("\033[?1049h"); // Alternate screen
+        enter_raw_mode();
+      }
+
+      if (n == 1 && buf[1] == 't') {
+        reset_mode();
+        // char *ret = execute_command("./scripts/change_statusbar.sh");
+        // write_string(sock, ret);
+        // free(ret);
+        write_string(sock, "cSelectStatus 0");
         enter_raw_mode();
       }
 
       if (n == 1 && buf[1] == 'c') {
         handle_rename(sock, "Name of New Window: ", "", "cCreateNamed");
-      } else if (n == 1 && buf[1] == ',') {
+      }
+
+      if (n == 1 && buf[1] == ',') {
         handle_rename(sock, "Rename Window: ", "", "cRenameWindow");
-      } else if (n == 1 && buf[1] == '$') {
+      }
+
+      if (n == 1 && buf[1] == '$') {
         handle_rename(sock, "Rename Session: ", "", "cRenameSession");
       }
 
       if (n == 1 && buf[1] == 'g') {
         reset_mode();
-        printf("\033[?1049l"); // Normal screen
-        printf("\033[2J");     // Clear screen
         system("./scripts/show_log.sh");
-        printf("\033[?1049h"); // Alternate screen
         enter_raw_mode();
         write_string(sock, "cLog");
       }
@@ -314,14 +324,6 @@ void *handle_events(void *socket_desc) {
       if (n == 1 && buf[1] == 's') {
         mode = MODE_CONTROL_STICKY;
         write_string(sock, "cModeControlSticky");
-      }
-
-      if (n == 1 && buf[1] == 'y') {
-        write_string(sock, "cCopySelection");
-      }
-
-      if (n == 1 && buf[1] == 'q') {
-        write_string(sock, "cQuit");
       }
 
       if (mode == MODE_CONTROL_STICKY) {

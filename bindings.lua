@@ -77,5 +77,7 @@ bindings["control"]["i"] = "cList"
 bindings["control"]["y"] = "cCycleStatus"
 bindings["control"]["r"] = "cReloadLua"
 bindings["control"]["z"] = "cZoom"
+bindings["control"]["q"] = "cQuit"
+bindings["control"]["y"] = "cCopySelection"
 
 -- TODO: Page Up and Page Down
