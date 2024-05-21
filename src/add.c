@@ -33,7 +33,7 @@ Window *add_window(Session *session, char *title) {
   window->pane_count = 0;
   window->current_pane = 0;
   window->panes = NULL;
-  window->layout = LAYOUT_MAIN_VERTICAL;
+  window->layout = strdup("layout_main_vertical");
   window->width = 80;
   window->height = 24;
   window->zoom = -1;

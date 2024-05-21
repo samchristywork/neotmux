@@ -82,31 +82,6 @@ void print_pane(Pane *pane) {
   print_process(pane->process);
 }
 
-void print_layout(Layout layout) {
-  switch (layout) {
-  case LAYOUT_DEFAULT:
-    LOG("    Layout: Default\n");
-    break;
-  case LAYOUT_EVEN_HORIZONTAL:
-    LOG("    Layout: Even Horizontal\n");
-    break;
-  case LAYOUT_EVEN_VERTICAL:
-    LOG("    Layout: Even Vertical\n");
-    break;
-  case LAYOUT_MAIN_HORIZONTAL:
-    LOG("    Layout: Main Horizontal\n");
-    break;
-  case LAYOUT_MAIN_VERTICAL:
-    LOG("    Layout: Main Vertical\n");
-    break;
-  case LAYOUT_TILED:
-    LOG("    Layout: Tiled\n");
-    break;
-  default:
-    LOG("    Layout: Unknown\n");
-    break;
-  }
-}
 
 void print_window(Window *window) {
   LOG("  Window: %s\n", window->title);
@@ -118,7 +93,7 @@ void print_window(Window *window) {
     LOG("    Zoom: %d\n", window->zoom);
   }
   LOG("    Current Pane: %d\n", window->current_pane);
-  print_layout(window->layout);
+  LOG("    %s\n", window->layout);
 
   for (int i = 0; i < window->pane_count; i++) {
     print_pane(&window->panes[i]);

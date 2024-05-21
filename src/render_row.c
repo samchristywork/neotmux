@@ -71,7 +71,7 @@ void draw_row(int row, int windowRow, Pane *pane, Window *currentWindow) {
     static int height = 0;
     static Window *window = NULL;
     static int pane_count = 0;
-    static Layout layout = 0;
+    static char *layout = 0;
     static int current_pane = 0;
     static int zoom = -1;
     if (width != currentWindow->width || height != currentWindow->height ||

@@ -237,7 +237,8 @@ void *handle_client(void *socket_desc) {
             exit(EXIT_FAILURE);
           } else if (read_size == -1) {
             p->process->closed = true;
-            WRITE_LOG(LOG_INFO, socket, "Process closed (%d)", p->process->fd);
+            WRITE_LOG(LOG_INFO, socket, "Process closed (FD: %d PID: %d)",
+                      p->process->fd, p->process->pid);
             reorder_panes(socket, w);
             continue;
           }

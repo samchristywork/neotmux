@@ -28,7 +28,6 @@ char *get_lua_string(lua_State *L, const char *name, char *default_value) {
   return result;
 }
 
-// TODO: Make sure we are accessing the right memory
 int handle_term_prop(VTermProp prop, VTermValue *val, void *user) {
   Process *process = (Process *)user;
   if (prop == VTERM_PROP_CURSORVISIBLE) {
@@ -86,8 +85,8 @@ void initialize_vterm_instance(VTerm **vt, VTermScreen **vts, int h, int w,
   callbacks.settermprop = handle_term_prop;
   callbacks.bell = NULL;
   callbacks.resize = NULL;
-  callbacks.sb_pushline = handle_push_line; // TODO: Use for scrolling
-  callbacks.sb_popline = NULL;              // TODO: Use for scrolling
+  callbacks.sb_pushline = handle_push_line;
+  callbacks.sb_popline = NULL;
 
   vterm_set_utf8(*vt, 1);
   vterm_screen_reset(*vts, 1);

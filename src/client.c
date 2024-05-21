@@ -1,3 +1,4 @@
+// TODO: Why does rename clear the screen?
 #include <lua5.4/lauxlib.h>
 #include <lua5.4/lualib.h>
 #include <pthread.h>

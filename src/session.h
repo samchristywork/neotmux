@@ -8,16 +8,6 @@
 
 #include "client.h"
 
-typedef enum Layout {
-  LAYOUT_DEFAULT = 0,
-  LAYOUT_EVEN_HORIZONTAL,
-  LAYOUT_EVEN_VERTICAL,
-  LAYOUT_MAIN_HORIZONTAL,
-  LAYOUT_MAIN_VERTICAL,
-  LAYOUT_TILED,
-  LAYOUT_CUSTOM,
-} Layout;
-
 typedef enum BarPosition { BAR_NONE, BAR_TOP, BAR_BOTTOM } BarPosition;
 
 typedef struct Cursor {
@@ -71,7 +61,7 @@ typedef struct Window {
   int current_pane;
   int width;
   int height;
-  Layout layout;
+  char *layout;
   int zoom;
   bool rerender;
 } Window;

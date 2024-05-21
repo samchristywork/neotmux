@@ -84,7 +84,6 @@ int init_server(char *name) {
 }
 
 int check_client(char *argv[]) {
-  // TODO: Don't check for NTMUX if running only in server mode.
   if (getenv("NTMUX") != NULL) {
     fprintf(stderr, "Cannot run Ntmux inside Ntmux\n\n");
     usage(argv[0]);

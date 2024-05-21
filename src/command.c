@@ -132,51 +132,19 @@ bool handle_directional_command(char *cmd) {
 
 // Category: Layout
 bool handle_layout_command(char *cmd) {
-  // Change the layout to even horizontal
-  if (strcmp(cmd, "Even_Horizontal") == 0) {
+  // Change the layout. The argument is the name of the function to be used
+  if (memcmp(cmd, "Layout", 6) == 0) {
+    if (strlen(cmd) < 7) { // Command with no argument
+      Window *w = get_current_window(neotmux);
+      calculate_layout(w);
+      return true;
+    }
+
+    char *layout = strdup(cmd + 7);
     Window *w = get_current_window(neotmux);
-    w->layout = LAYOUT_EVEN_HORIZONTAL;
+    free(w->layout);
+    w->layout = layout;
     calculate_layout(w);
-
-    // Change the layout to even vertical
-  } else if (strcmp(cmd, "Even_Vertical") == 0) {
-    Window *w = get_current_window(neotmux);
-    w->layout = LAYOUT_EVEN_VERTICAL;
-    calculate_layout(w);
-
-    // Change the layout to main horizontal
-  } else if (strcmp(cmd, "Main_Horizontal") == 0) {
-    Window *w = get_current_window(neotmux);
-    w->layout = LAYOUT_MAIN_HORIZONTAL;
-    calculate_layout(w);
-
-    // Change the layout to main vertical
-  } else if (strcmp(cmd, "Main_Vertical") == 0) {
-    Window *w = get_current_window(neotmux);
-    w->layout = LAYOUT_MAIN_VERTICAL;
-    calculate_layout(w);
-
-    // Change the layout to tiled
-  } else if (strcmp(cmd, "Tiled") == 0) {
-    Window *w = get_current_window(neotmux);
-    w->layout = LAYOUT_TILED;
-    calculate_layout(w);
-
-    // Change the layout to custom
-  } else if (strcmp(cmd, "Custom") == 0) {
-    Window *w = get_current_window(neotmux);
-    w->layout = LAYOUT_CUSTOM;
-    calculate_layout(w);
-
-    // Recalculate the layout
-  } else if (strcmp(cmd, "Layout") == 0) {
-    // TODO: Fix
-    // if (session->current_window > 0 &&
-    //    session->current_window < session->window_count) {
-
-    Window *currentWindow = get_current_window(neotmux);
-    calculate_layout(currentWindow);
-    //}
   } else {
     return false;
   }

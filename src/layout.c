@@ -75,31 +75,6 @@ void calculate_layout(Window *window) {
     window->panes[window->zoom].width = window->width;
     update_layout(window);
   } else {
-    switch (window->layout) {
-    case LAYOUT_DEFAULT:
-      // TODO: Implement default layout
-      break;
-    case LAYOUT_EVEN_HORIZONTAL:
-      apply_custom_layout(window, "layout_even_horizontal");
-      break;
-    case LAYOUT_EVEN_VERTICAL:
-      apply_custom_layout(window, "layout_even_vertical");
-      break;
-    case LAYOUT_MAIN_HORIZONTAL:
-      apply_custom_layout(window, "layout_main_horizontal");
-      break;
-    case LAYOUT_MAIN_VERTICAL:
-      apply_custom_layout(window, "layout_main_vertical");
-      break;
-    case LAYOUT_TILED:
-      apply_custom_layout(window, "layout_tiled");
-      break;
-    case LAYOUT_CUSTOM:
-      // TODO: Fix how borders work to make this look correct
-      apply_custom_layout(window, "layout_custom");
-      break;
-    default:
-      break;
-    }
+    apply_custom_layout(window, window->layout);
   }
 }
