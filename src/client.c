@@ -251,9 +251,6 @@ void *handle_events(void *socket_desc) {
       } else if (n == 1 && buf[1] == 1) { // Ctrl-A
         mode = MODE_CONTROL;
         write_string(sock, "cModeControl");
-      } else if (n == 1 && buf[1] == 10) { // Enter
-        buf[1] = 13;                       // Change newline to carriage return
-        write_message(sock, buf, n + 1);
       } else {
         write_message(sock, buf, n + 1);
       }
@@ -363,13 +360,37 @@ void handle_sigint(int sig) {
 }
 
 int start_client(int sock) {
-  char *filename = "bindings.lua";
+  L = luaL_newstate();
+  luaL_openlibs(L);
+  register_functions(L);
   struct stat buffer;
-  if (stat(filename, &buffer) == 0) {
-    L = luaL_newstate();
-    luaL_openlibs(L);
-    register_functions(L);
-    luaL_dofile(L, filename);
+
+  {
+    char *filename = "bindings/handle.lua";
+    if (stat(filename, &buffer) == 0) {
+      if (luaL_dofile(L, filename)) {
+        fprintf(stderr, "Error loading %s: %s\n", filename,
+                lua_tostring(L, -1));
+        lua_close(L);
+        int one_second = 1000000;
+        usleep(one_second * 5);
+        return EXIT_FAILURE;
+      }
+    }
+  }
+
+  {
+    char *filename = "bindings/init.lua";
+    if (stat(filename, &buffer) == 0) {
+      if (luaL_dofile(L, filename)) {
+        fprintf(stderr, "Error loading %s: %s\n", filename,
+                lua_tostring(L, -1));
+        lua_close(L);
+        int one_second = 1000000;
+        usleep(one_second * 5);
+        return EXIT_FAILURE;
+      }
+    }
   }
 
   signal(SIGINT, handle_sigint);
