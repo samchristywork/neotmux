@@ -100,11 +100,6 @@ void write_status_bar(int socket, int cols) {
       session->window_count, current_window);
 
   if (statusbar) {
-    vterm_input_write(vt, "\033[0m", 4);      // Reset colors
-    vterm_input_write(vt, "\033[7m", 4);      // Enable reverse
-    vterm_input_write(vt, "\033[38;5;4m", 9); // Set foreground color
-    vterm_input_write(vt, "\033[1;1H", 6);    // Move cursor to top left
-    vterm_input_write(vt, "\033[2K", 4);      // Clear line
     vterm_input_write(vt, statusbar, strlen(statusbar));
     free(statusbar);
 

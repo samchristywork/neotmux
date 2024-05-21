@@ -1,53 +1,20 @@
-function system(cmd)
-  local f = io.popen(cmd)
-  local l = f:read("*a")
-  f:close()
-  return l
-end
+require("bars")
 
-function statusbar_left(sessionName, windowTitles, mode)
-  left = ""
-  left = left .. mode
-  left = left .. " [" .. sessionName .. "]"
-  for i, e in ipairs(windowTitles) do
-    left = left .. "  " .. e.title
-    if e.active then
-      left = left .. "*"
-    end
-    if e.zoom then
-      left = left .. "Z"
-    end
-  end
-
-  return left, #left
-end
-
-
-function default_bar(sessionName, windowTitles, mode)
-  hostname = system("hostname"):gsub("\n", "")
-  date = os.date("%H:%M %d-%b-%Y")
-  ret = ' "' .. hostname .. '" ' .. date
-
-  return ret, #ret
-end
-
-local frame = 0;
-function frame_bar(sessionName, windowTitles, mode)
-  ret = "" .. frame
-  frame = frame + 1
-  return ret, #ret
-end
+bars = {
+  {statusbar_left, default_bar},
+  {statusbar_left, frame_bar},
+}
 
 function statusbar(idx, cols, sessionName, windowTitles, mode)
-  local bars = {
-    {statusbar_left, default_bar},
-    {statusbar_left, frame_bar},
-  }
+  local ctrl = "\x1b[0m" -- Reset colors
+  ctrl = ctrl .. "\x1b[7m" -- Enable reverse
+  ctrl = ctrl .. "\x1b[38;5;4m" -- Set foreground color
+  ctrl = ctrl .. "\x1b[1;1H" -- Move cursor to top left
 
   local idx = idx % #bars + 1
   local left, lWidth = bars[idx][1](sessionName, windowTitles, mode)
   local right, rWidth = bars[idx][2](sessionName, windowTitles, mode)
   padding = string.rep(" ", cols - lWidth - rWidth)
 
-  return left .. padding .. right
+  return ctrl .. left .. padding .. right
 end
