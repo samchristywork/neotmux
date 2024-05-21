@@ -82,7 +82,6 @@ void print_pane(Pane *pane) {
   print_process(pane->process);
 }
 
-
 void print_window(Window *window) {
   LOG("  Window: %s\n", window->title);
   LOG("    Width: %d\n", window->width);

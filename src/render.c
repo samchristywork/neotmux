@@ -152,6 +152,26 @@ void write_cursor_style() {
   }
 }
 
+void handle_post_render(int fd) {
+  buf_write("\033[1;1H", 6);
+  buf_write("\033[0m", 4);
+
+  lua_getglobal(neotmux->lua, "post_render");
+  if (lua_isfunction(neotmux->lua, -1)) {
+    Window *currentWindow = get_current_window(neotmux);
+    lua_pushinteger(neotmux->lua, currentWindow->width);
+    lua_pushinteger(neotmux->lua, currentWindow->height);
+    lua_call(neotmux->lua, 2, 1);
+    if (lua_isstring(neotmux->lua, -1)) {
+      const char *result = lua_tostring(neotmux->lua, -1);
+      buf_write(result, strlen(result));
+    }
+    lua_pop(neotmux->lua, 1);
+  } else {
+    WRITE_LOG(LOG_WARN, fd, "post_render is not a function");
+  }
+}
+
 void render(int fd, RenderType type) {
   neotmux->bb.n = 0 + sizeof(uint64_t);
 
@@ -165,6 +185,8 @@ void render(int fd, RenderType type) {
     float r = (float)n / (x * y);
     WRITE_LOG(LOG_PERF, fd, "Render (%dx%d). Writing %d bytes (%f bytes/cell)",
               x, y, n, r);
+
+    handle_post_render(fd);
   } else if (type == RENDER_BAR) {
     render_bar(fd);
   }
