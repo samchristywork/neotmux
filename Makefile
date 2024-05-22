@@ -22,9 +22,9 @@ simple:
 run: build/ntmux
 	unset NTMUX && ${TERMINAL} -e build/ntmux -n test
 
-#run: build/ntmux
-#	unset NTMUX && build/ntmux -n distributed -s &
-#	unset NTMUX && ${TERMINAL} -e build/ntmux -n distributed -c
+distributed: build/ntmux
+	unset NTMUX && build/ntmux -n distributed -s &
+	unset NTMUX && ${TERMINAL} -e build/ntmux -n distributed -c
 
 dev: build/ntmux
 	${TERMINAL} -e build/ntmux -n dev -l dev.log

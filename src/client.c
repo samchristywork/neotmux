@@ -359,14 +359,15 @@ void handle_sigint(int sig) {
   signal(sig, handle_sigint);
 }
 
-int start_client(int sock) {
+int start_client(int sock, char *bindings) {
   L = luaL_newstate();
   luaL_openlibs(L);
   register_functions(L);
   struct stat buffer;
 
   {
-    char *filename = "bindings/handle.lua";
+    char filename[PATH_MAX];
+    sprintf(filename, "%s/handle.lua", bindings);
     if (stat(filename, &buffer) == 0) {
       if (luaL_dofile(L, filename)) {
         fprintf(stderr, "Error loading %s: %s\n", filename,
@@ -380,7 +381,8 @@ int start_client(int sock) {
   }
 
   {
-    char *filename = "bindings/init.lua";
+    char filename[PATH_MAX];
+    sprintf(filename, "%s/init.lua", bindings);
     if (stat(filename, &buffer) == 0) {
       if (luaL_dofile(L, filename)) {
         fprintf(stderr, "Error loading %s: %s\n", filename,

@@ -116,6 +116,7 @@ int main(int argc, char *argv[]) {
   add_arg('u', "unix", "Use UNIX sockets (default)", ARG_NONE);
   add_arg('v', "version", "Show the version number and license info", ARG_NONE);
   add_arg('d', "debug", "Log level (default INFO)", ARG_REQUIRED);
+  add_arg('b', "bindings", "Path to the bindings plugin", ARG_REQUIRED);
 
   bool help = get_arg_bool(argc, argv, 'h', false);
   bool version = get_arg_bool(argc, argv, 'v', false);
@@ -127,6 +128,7 @@ int main(int argc, char *argv[]) {
   char *log_filename = get_arg_string(argc, argv, 'l', "ntmux.log");
   char *log_level_string = get_arg_string(argc, argv, 'd', "INFO");
   // int port = get_arg_int(argc, argv, 'p', 5097);
+  char *bindings = get_arg_string(argc, argv, 'b', "bindings");
 
   if (strcmp(log_level_string, "PERF") == 0) {
     log_level = LOG_PERF;
@@ -173,7 +175,7 @@ int main(int argc, char *argv[]) {
     }
 
     int sock = init_client(name);
-    return start_client(sock);
+    return start_client(sock, bindings);
   } else if (!client_mode && server_mode) {
     // TODO: Check if server is already running
     int sock = init_server(name);
