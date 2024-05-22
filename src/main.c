@@ -185,21 +185,15 @@ int main(int argc, char *argv[]) {
       return EXIT_FAILURE;
     }
 
+    // Start both at once
     pid_t pid = fork();
     if (pid == 0) {
-      // Child process
+      // TODO: Check if server is already running
       int sock = init_server(name);
-      close(0);
-      close(1);
-      close(2);
       return start_server(sock, name, log_filename, commands, nCommands);
-    } else if (pid > 0) {
-      // Parent process
-      int sock = init_client(name);
-      return start_client(sock);
     } else {
-      perror("fork");
-      return EXIT_FAILURE;
+      int sock = init_client(name);
+      return start_client(sock, bindings);
     }
   }
 
