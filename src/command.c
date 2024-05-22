@@ -187,7 +187,7 @@ bool handle_debug_command(int socket, char *cmd) {
 bool handle_control_command(int socket, char *cmd) {
   // Initialize the window, session, and pane.
   if (strcmp(cmd, "Init") == 0) {
-    load_plugins(socket);
+    init_plugins(socket);
 
     Session *s = add_session(neotmux, "Main");
     Window *w = add_window(s, "Main");
@@ -211,7 +211,7 @@ bool handle_control_command(int socket, char *cmd) {
 
     // Reload the Lua plugins
   } else if (strcmp(cmd, "ReloadLua") == 0) {
-    load_plugins(socket);
+    init_plugins(socket);
 
     // Quit the program
   } else if (strcmp(cmd, "Quit") == 0) {
