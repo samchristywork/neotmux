@@ -79,6 +79,22 @@ bool handle_render_command(int socket, char *cmd) {
   return true;
 }
 
+// Category: Lua
+bool handle_lua_command(char *cmd) {
+  if (!neotmux->lua) {
+    return false;
+  }
+
+  lua_getglobal(neotmux->lua, cmd);
+  if (lua_isfunction(neotmux->lua, -1)) {
+    lua_call(neotmux->lua, 0, 0);
+    return true;
+  } else {
+    lua_pop(neotmux->lua, 1);
+    return false;
+  }
+}
+
 // Category: Directional
 bool handle_directional_command(char *cmd) {
   // Swap the current pane with the pane to the left
@@ -393,6 +409,8 @@ void handle_command(int socket, char *buf, int read_size) {
   WRITE_LOG(LOG_EVENT, socket, "%s", cmd);
 
   if (handle_render_command(socket, cmd)) {
+    return;
+  } else if (handle_lua_command(cmd)) {
     return;
   } else if (handle_directional_command(cmd)) {
     return;
