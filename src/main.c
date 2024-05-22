@@ -104,8 +104,19 @@ int check_client(char *argv[]) {
   return EXIT_SUCCESS;
 }
 
+int send_input(int sock, char *input) {
+  if (send(sock, input, strlen(input), 0) < 0) {
+    perror("send failed");
+    return EXIT_FAILURE;
+  }
+
+  return EXIT_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
+  add_arg('b', "bindings", "Path to the bindings plugin", ARG_REQUIRED);
   add_arg('c', "client", "Run Ntmux in client mode", ARG_NONE);
+  add_arg('d', "debug", "Log level (default INFO)", ARG_REQUIRED);
   add_arg('e', "command", "Initial commands to run in each pane", ARG_MULTIPLE);
   add_arg('h', "help", "Show this help message", ARG_NONE);
   add_arg('i', "inet", "Use INET sockets", ARG_NONE);
@@ -113,10 +124,9 @@ int main(int argc, char *argv[]) {
   add_arg('n', "name", "Name of the socket (default \"local\")", ARG_REQUIRED);
   add_arg('p', "port", "Port number to use (default 5097)", ARG_REQUIRED);
   add_arg('s', "server", "Run Ntmux in server mode", ARG_NONE);
+  add_arg('t', "input", "Send input to the server", ARG_REQUIRED);
   add_arg('u', "unix", "Use UNIX sockets (default)", ARG_NONE);
   add_arg('v', "version", "Show the version number and license info", ARG_NONE);
-  add_arg('d', "debug", "Log level (default INFO)", ARG_REQUIRED);
-  add_arg('b', "bindings", "Path to the bindings plugin", ARG_REQUIRED);
 
   bool help = get_arg_bool(argc, argv, 'h', false);
   bool version = get_arg_bool(argc, argv, 'v', false);
@@ -129,6 +139,12 @@ int main(int argc, char *argv[]) {
   char *log_level_string = get_arg_string(argc, argv, 'd', "INFO");
   // int port = get_arg_int(argc, argv, 'p', 5097);
   char *bindings = get_arg_string(argc, argv, 'b', "bindings");
+  char *input = get_arg_string(argc, argv, 't', NULL);
+
+  if (input != NULL) {
+    int sock = init_client(name);
+    return send_input(sock, input);
+  }
 
   if (strcmp(log_level_string, "PERF") == 0) {
     log_level = LOG_PERF;
