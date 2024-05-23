@@ -297,6 +297,12 @@ void *handle_events(void *socket_desc) {
         write_string(sock, "cLog");
       }
 
+      if (n == 1 && buf[1] == '?') {
+        reset_mode();
+        system("./scripts/help.sh");
+        enter_raw_mode();
+      }
+
       // TODO: Move to Lua
       if (n == 1 && buf[1] == 'n') {
         send_size(sock);
