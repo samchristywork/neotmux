@@ -84,6 +84,20 @@ add_binding("c", "x", Command("CopySelection"), "Copy selection")
 add_binding("c", "y", Command("CycleStatus"), "Cycle status")
 add_binding("c", "z", Command("Zoom"), "Zoom pane")
 
+add_binding("c", "?", function(sock)
+  system("clear")
+  reset_mode()
+  system("./scripts/help.sh")
+  enter_raw_mode()
+end, "Display help")
+
+add_binding("c", "g", function(sock)
+  system("clear")
+  reset_mode()
+  system("./scripts/show_log.sh")
+  enter_raw_mode()
+end, "Show log")
+
 -- TODO: Page Up and Page Down
 
 util.print_unused_bindings(bindings)

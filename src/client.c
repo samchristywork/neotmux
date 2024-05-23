@@ -155,8 +155,36 @@ int lua_write_string(lua_State *L) {
   return 0;
 }
 
+int lua_enter_raw_mode(lua_State *L) {
+  if (!L) {
+    return 0;
+  }
+  enter_raw_mode();
+  return 0;
+}
+
+int lua_reset_mode(lua_State *L) {
+  if (!L) {
+    return 0;
+  }
+  reset_mode();
+  return 0;
+}
+
+int lua_system(lua_State *L) {
+  if (!L) {
+    return 0;
+  }
+  const char *cmd = lua_tostring(L, 1);
+  system(cmd);
+  return 0;
+}
+
 void register_functions(lua_State *L) {
   lua_register(L, "write_string", lua_write_string);
+  lua_register(L, "enter_raw_mode", lua_enter_raw_mode);
+  lua_register(L, "reset_mode", lua_reset_mode);
+  lua_register(L, "system", lua_system);
 }
 
 lua_State *L = NULL;
@@ -288,19 +316,6 @@ void *handle_events(void *socket_desc) {
 
       if (n == 1 && buf[1] == '$') {
         handle_rename(sock, "Rename Session: ", "", "cRenameSession");
-      }
-
-      if (n == 1 && buf[1] == 'g') {
-        reset_mode();
-        system("./scripts/show_log.sh");
-        enter_raw_mode();
-        write_string(sock, "cLog");
-      }
-
-      if (n == 1 && buf[1] == '?') {
-        reset_mode();
-        system("./scripts/help.sh");
-        enter_raw_mode();
       }
 
       // TODO: Move to Lua

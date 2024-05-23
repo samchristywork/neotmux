@@ -1,3 +1,4 @@
 #!/bin/bash
 
-bat ./ntmux.log
+clear
+bat ./ntmux.log --paging=always
