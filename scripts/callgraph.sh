@@ -126,6 +126,10 @@ echo "start_client->handle_events"
 echo "start_server_loop->handle_cleanup"
 echo "write_message->read_message[style=dashed weight=0]"
 echo "render->receive_message[style=dashed weight=0]"
+echo "register_functions->lua_write_string"
+echo "register_functions->lua_enter_raw_mode"
+echo "register_functions->lua_reset_mode"
+echo "register_functions->lua_system"
 
 echo "}"
 ) > /tmp/callgraph.dot
