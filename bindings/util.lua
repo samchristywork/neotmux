@@ -1,6 +1,6 @@
 local util = {}
 
-function util.print_unused_bindings(bindings)
+function util.print_unused_bindings()
   print("No control bindings for:")
   for i = 0, 25 do
     if bindings["control"][string.char(i + 97)] == nil then
