@@ -5,7 +5,7 @@ bars = {
   {statusbar_left, frame_bar},
 }
 
-function statusbar(idx, cols, sessionName, windowTitles, mode)
+function ntmux.statusbar(idx, cols, sessionName, windowTitles, mode)
   local ctrl = "\x1b[0m" -- Reset colors
   ctrl = ctrl .. "\x1b[7m" -- Enable reverse
   ctrl = ctrl .. "\x1b[38;5;4m" -- Set foreground color
