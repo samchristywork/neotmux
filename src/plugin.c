@@ -80,6 +80,9 @@ bool init_plugins(int socket) {
   char *s = "print('Lua initialized')";
   luaL_dostring(neotmux->lua, s);
 
+  lua_newtable(neotmux->lua);
+  lua_setglobal(neotmux->lua, "ntmux");
+
   load_plugins(socket);
 
   char *home = getenv("HOME");

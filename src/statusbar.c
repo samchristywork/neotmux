@@ -12,9 +12,16 @@ extern Neotmux *neotmux;
 char *call_statusbar_function(int socket, int cols, lua_State *lua,
                               char *sessionName, Window *windows,
                               int windowCount, Window *currentWindow) {
-  lua_getglobal(lua, "statusbar");
+  lua_getglobal(lua, "ntmux");
+  if (!lua_istable(lua, -1)) {
+    WRITE_LOG(LOG_WARN, socket, "ntmux is not a table");
+    lua_pop(lua, 1);
+    return NULL;
+  }
+
+  lua_getfield(lua, -1, "statusbar");
   if (!lua_isfunction(lua, -1)) {
-    WRITE_LOG(LOG_WARN, socket, "statusbar is not a function");
+    WRITE_LOG(LOG_WARN, socket, "ntmux.statusbar is not a function");
     lua_pop(lua, 1);
     return NULL;
   }
