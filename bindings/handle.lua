@@ -1,5 +1,5 @@
 function handle_binding_normal(sock, buf)
-  for key, value in pairs(bindings["normal"]) do
+  for key, value in pairs(bindings.normal) do
     if (buf == key) then
       local command = value.command
       if (type(command) == "function") then
@@ -14,7 +14,7 @@ function handle_binding_normal(sock, buf)
 end
 
 function handle_binding_control(sock, buf)
-  for key, value in pairs(bindings["control"]) do
+  for key, value in pairs(bindings.control) do
     if (buf == key) then
       local command = value.command
       if (type(command) == "function") then

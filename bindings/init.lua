@@ -4,17 +4,19 @@ local Event = util.Event
 
 local alt = "\x1b"
 
+bindings = {}
+bindings.normal = {}
+bindings.control = {}
+
 function add_binding(mode, key, value, docs)
-  local normal = bindings["normal"]
-  local control = bindings["control"]
   if mode == "n" then
-    normal[key] = {}
-    normal[key].command = value
-    normal[key].docs = docs
+    bindings.normal[key] = {}
+    bindings.normal[key].command = value
+    bindings.normal[key].docs = docs
   elseif mode == "c" then
-    control[key] = {}
-    control[key].command = value
-    control[key].docs = docs
+    bindings.control[key] = {}
+    bindings.control[key].command = value
+    bindings.control[key].docs = docs
   end
 end
 

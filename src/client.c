@@ -375,17 +375,6 @@ int start_client(int sock, char *bindings) {
   luaL_openlibs(L);
   register_functions(L);
 
-  lua_newtable(L);
-  lua_setglobal(L, "bindings");
-
-  lua_getglobal(L, "bindings");
-  lua_newtable(L);
-  lua_setfield(L, -2, "control");
-
-  lua_getglobal(L, "bindings");
-  lua_newtable(L);
-  lua_setfield(L, -2, "normal");
-
   struct stat buffer;
 
   {
