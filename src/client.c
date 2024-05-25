@@ -186,8 +186,28 @@ int lua_system(lua_State *L) {
   }
 
   const char *cmd = lua_tostring(L, 1);
-  system(cmd);
-  return 0;
+
+  FILE *f = popen(cmd, "r");
+  if (f == NULL) {
+    printf("Failed to run command\n");
+    exit(EXIT_FAILURE);
+  }
+
+  // TODO: Make sure this actually works
+  char *ret = malloc(1024);
+  char *p = ret;
+  while (fgets(p, 1024, f) != NULL) {
+    p += strlen(p);
+    ret = realloc(ret, strlen(ret) + 1024);
+  }
+
+  pclose(f);
+
+  lua_pushstring(L, ret);
+
+  free(ret);
+
+  return 1;
 }
 
 void register_functions(lua_State *L) {
