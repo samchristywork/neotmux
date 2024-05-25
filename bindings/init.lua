@@ -58,8 +58,6 @@ add_binding("n", alt.."6", Command("Layout layout_custom"), "Custom layout")
 
 -- Misc.
 add_binding("n", "\x0a", Event("\x0d"), nil) -- Convert newline to carriage return
-add_binding("n", alt.."n", Command("Next"), "Next window")
-add_binding("n", alt.."p", Command("Prev"), "Previous window")
 add_binding("n", alt.."z", Command("Zoom"), "Zoom window")
 
 -- Splits
@@ -71,8 +69,6 @@ add_binding("c", "%", Command("VSplit"), "Split vertically")
 
 -- Window
 add_binding("c", "e", Command("Create"), "Create window")
-add_binding("c", "n", Command("Next"), "Next window")
-add_binding("c", "p", Command("Prev"), "Previous window")
 
 -- Misc.
 add_binding("c", "\x01", Event("\x01"), nil) -- Ctrl + A
@@ -83,6 +79,34 @@ add_binding("c", "r", Command("ReloadLua"), "Reload Lua")
 add_binding("c", "x", Command("CopySelection"), "Copy selection")
 add_binding("c", "y", Command("CycleStatus"), "Cycle status")
 add_binding("c", "z", Command("Zoom"), "Zoom pane")
+
+add_binding("n", alt.."n", function(sock)
+  write_string(sock, Command("Next"))
+  send_size(sock)
+  write_string(sock, Command("ReRender"));
+  write_string(sock, Command("RenderBar"));
+end, "Next window")
+
+add_binding("n", alt.."p", function(sock)
+  write_string(sock, Command("Prev"))
+  send_size(sock)
+  write_string(sock, Command("ReRender"));
+  write_string(sock, Command("RenderBar"));
+end, "Previous window")
+
+add_binding("c", "n", function(sock)
+  write_string(sock, Command("Next"))
+  send_size(sock)
+  write_string(sock, Command("ReRender"));
+  write_string(sock, Command("RenderBar"));
+end, "Next window")
+
+add_binding("c", "p", function(sock)
+  write_string(sock, Command("Prev"))
+  send_size(sock)
+  write_string(sock, Command("ReRender"));
+  write_string(sock, Command("RenderBar"));
+end, "Previous window")
 
 add_binding("c", "?", function(sock)
   system("clear")
