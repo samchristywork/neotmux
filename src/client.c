@@ -171,10 +171,20 @@ int lua_reset_mode(lua_State *L) {
   return 0;
 }
 
+int lua_send_size(lua_State *L) {
+  if (!L) {
+    return 0;
+  }
+  int sock = lua_tointeger(L, 1);
+  send_size(sock);
+  return 0;
+}
+
 int lua_system(lua_State *L) {
   if (!L) {
     return 0;
   }
+
   const char *cmd = lua_tostring(L, 1);
   system(cmd);
   return 0;
@@ -185,6 +195,7 @@ void register_functions(lua_State *L) {
   lua_register(L, "enter_raw_mode", lua_enter_raw_mode);
   lua_register(L, "reset_mode", lua_reset_mode);
   lua_register(L, "system", lua_system);
+  lua_register(L, "send_size", lua_send_size);
 }
 
 lua_State *L = NULL;
@@ -316,16 +327,6 @@ void *handle_events(void *socket_desc) {
 
       if (n == 1 && buf[1] == '$') {
         handle_rename(sock, "Rename Session: ", "", "cRenameSession");
-      }
-
-      // TODO: Move to Lua
-      if (n == 1 && buf[1] == 'n') {
-        send_size(sock);
-      }
-
-      // TODO: Move to Lua
-      if (n == 1 && buf[1] == 'p') {
-        send_size(sock);
       }
 
       if (n == 1 && buf[1] == 's') {
