@@ -13,7 +13,7 @@
 #include "border.h"
 #include "log.h"
 #include "render.h"
-#include "render_row.h"
+#include "render_pane.h"
 #include "session.h"
 #include "statusbar.h"
 
@@ -42,22 +42,7 @@ bool renderBorders = true;
   bzero(&neotmux->prevCell, sizeof(neotmux->prevCell));                        \
   buf_write("\033[0m", 4);
 
-void draw_pane(Pane *pane, Window *window) {
-  if (pane->process->cursor.mouse_active != VTERM_PROP_MOUSE_NONE) {
-    pane->selection.active = false;
-  }
-  clear_style();
-  for (int row = 0; row < pane->height; row++) {
-    int windowRow = pane->row + row;
-    if (windowRow < 0 || windowRow >= window->height) {
-      continue;
-    }
-
-    draw_row(row, windowRow, pane, window);
-  }
-  // draw_bar(pane, window);
-}
-
+// TODO: Fix top bar
 void render_screen() {
   if (neotmux->barPos == BAR_NONE) {
     neotmux->barPos = BAR_BOTTOM;
