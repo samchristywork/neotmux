@@ -122,6 +122,13 @@ add_binding("c", "g", function(sock)
   enter_raw_mode()
 end, "Show log")
 
+add_binding("c", "o", function(sock)
+  reset_mode()
+  local ret = system("./scripts/list_commands.sh")
+  write_string(sock, ret)
+  enter_raw_mode()
+end, "Select command from a list")
+
 -- TODO: Page Up and Page Down
 
 util.print_unused_bindings()
