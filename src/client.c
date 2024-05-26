@@ -111,14 +111,6 @@ void send_size(int sock) {
   write_message(sock, buf, 9);
 }
 
-void handle_binding(size_t numRead, char *buf, int sock, char *command,
-                    char *binding) {
-  if (numRead == strlen(binding) &&
-      strncmp(buf + 1, binding, strlen(binding)) == 0) {
-    write_string(sock, command);
-  }
-}
-
 char *readline_text;
 int add_readline_history() {
   rl_insert_text(readline_text);
@@ -330,13 +322,15 @@ void *handle_events(void *socket_desc) {
         }
       }
 
-      if (mode == MODE_CONTROL) {
-        mode = MODE_NORMAL;
-        write_string(sock, "cModeNormal");
-      }
+      if (n >= 1 && buf[1] != 27) {
+        if (mode == MODE_CONTROL) {
+          mode = MODE_NORMAL;
+          write_string(sock, "cModeNormal");
+        }
 
-      write_string(sock, "cReRender");
-      write_string(sock, "cRenderBar");
+        write_string(sock, "cReRender");
+        write_string(sock, "cRenderBar");
+      }
     }
   }
 
