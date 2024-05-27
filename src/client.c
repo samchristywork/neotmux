@@ -42,23 +42,25 @@ void disable_mouse_tracking() {
 
 // TODO: This is a hack
 bool rawMode = false;
-void enter_raw_mode() {
-  printf("\033[?1049h"); // Alternate screen
-  tcgetattr(STDIN_FILENO, &term);
-  term.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSANOW, &term);
-  enable_mouse_tracking();
-  rawMode = true;
-}
+#define enter_raw_mode()                                                       \
+  {                                                                            \
+    printf("\033[?1049h"); /* Alternate screen */                              \
+    tcgetattr(STDIN_FILENO, &term);                                            \
+    term.c_lflag &= ~(ICANON | ECHO);                                          \
+    tcsetattr(STDIN_FILENO, TCSANOW, &term);                                   \
+    enable_mouse_tracking();                                                   \
+    rawMode = true;                                                            \
+  }
 
-void reset_mode() {
-  disable_mouse_tracking();
-  term.c_lflag |= ICANON | ECHO;
-  tcsetattr(STDIN_FILENO, TCSANOW, &term);
-  rawMode = false;
-  printf("\033[?1049l"); // Normal screen
-  printf("\033[2J");     // Clear screen
-}
+#define reset_mode()                                                           \
+  {                                                                            \
+    disable_mouse_tracking();                                                  \
+    term.c_lflag |= ICANON | ECHO;                                             \
+    tcsetattr(STDIN_FILENO, TCSANOW, &term);                                   \
+    rawMode = false;                                                           \
+    printf("\033[?1049l"); /* Normal screen */                                 \
+    printf("\033[2J");     /* Clear screen */                                  \
+  }
 
 bool receive_message(int sock) {
   // Get size of message
