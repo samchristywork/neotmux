@@ -240,6 +240,8 @@ void *handle_client(void *socket_desc) {
             WRITE_LOG(LOG_INFO, socket, "Process closed (FD: %d PID: %d)",
                       p->process->fd, p->process->pid);
             reorder_panes(socket, w);
+            run_command(socket, "cRenderBar", 10);
+            run_command(socket, "cRenderScreen", 13);
             continue;
           }
           vterm_input_write(p->process->vt, buf, read_size);
