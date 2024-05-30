@@ -108,24 +108,41 @@ add_binding("c", "p", function(sock)
   write_string(sock, Command("RenderBar"));
 end, "Previous window")
 
+function run_script(script)
+  local f = io.popen(script)
+  local lines = {}
+  for line in f:lines() do
+    table.insert(lines, line)
+  end
+  f:close()
+  return lines
+end
+
 add_binding("c", "?", function(sock)
-  system("clear")
   reset_mode()
-  system("./scripts/help.sh")
+  local lines = run_script("./scripts/help.sh")
+  for i, line in ipairs(lines) do
+    write_string(sock, "c" .. line)
+  end
   enter_raw_mode()
 end, "Display help")
 
 add_binding("c", "g", function(sock)
-  system("clear")
+  run_script("clear")
   reset_mode()
-  system("./scripts/show_log.sh")
+  local lines = run_script("./scripts/show_log.sh")
+  for i, line in ipairs(lines) do
+    write_string(sock, line)
+  end
   enter_raw_mode()
 end, "Show log")
 
 add_binding("c", "o", function(sock)
   reset_mode()
-  local ret = system("./scripts/list_commands.sh")
-  write_string(sock, ret)
+  local lines = run_script("./scripts/list_commands.sh")
+  for i, line in ipairs(lines) do
+    write_string(sock, line)
+  end
   enter_raw_mode()
 end, "Select command from a list")
 

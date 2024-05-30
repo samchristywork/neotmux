@@ -44,7 +44,6 @@ void disable_mouse_tracking() {
 bool rawMode = false;
 #define enter_raw_mode()                                                       \
   {                                                                            \
-    printf("\033[?1049h"); /* Alternate screen */                              \
     tcgetattr(STDIN_FILENO, &term);                                            \
     term.c_lflag &= ~(ICANON | ECHO);                                          \
     tcsetattr(STDIN_FILENO, TCSANOW, &term);                                   \
@@ -58,8 +57,6 @@ bool rawMode = false;
     term.c_lflag |= ICANON | ECHO;                                             \
     tcsetattr(STDIN_FILENO, TCSANOW, &term);                                   \
     rawMode = false;                                                           \
-    printf("\033[?1049l"); /* Normal screen */                                 \
-    printf("\033[2J");     /* Clear screen */                                  \
   }
 
 bool receive_message(int sock) {
@@ -174,41 +171,10 @@ int lua_send_size(lua_State *L) {
   return 0;
 }
 
-int lua_system(lua_State *L) {
-  if (!L) {
-    return 0;
-  }
-
-  const char *cmd = lua_tostring(L, 1);
-
-  FILE *f = popen(cmd, "r");
-  if (f == NULL) {
-    printf("Failed to run command\n");
-    exit(EXIT_FAILURE);
-  }
-
-  // TODO: Make sure this actually works
-  char *ret = malloc(1024);
-  char *p = ret;
-  while (fgets(p, 1024, f) != NULL) {
-    p += strlen(p);
-    ret = realloc(ret, strlen(ret) + 1024);
-  }
-
-  pclose(f);
-
-  lua_pushstring(L, ret);
-
-  free(ret);
-
-  return 1;
-}
-
 void register_functions(lua_State *L) {
   lua_register(L, "write_string", lua_write_string);
   lua_register(L, "enter_raw_mode", lua_enter_raw_mode);
   lua_register(L, "reset_mode", lua_reset_mode);
-  lua_register(L, "system", lua_system);
   lua_register(L, "send_size", lua_send_size);
 }
 
